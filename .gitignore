@@ -1,0 +1,10 @@
+.env
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+backend/cookies.json
+cookies.json
+.claude/
