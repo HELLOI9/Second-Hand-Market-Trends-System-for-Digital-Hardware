@@ -15,7 +15,7 @@ from typing import Sequence
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crawler import RawItem
@@ -136,13 +136,28 @@ async def compute_daily_stats(
             and_(
                 PriceSnapshot.hardware_id == hardware.id,
                 PriceSnapshot.snapshot_date == stat_date,
+                PriceSnapshot.is_valid == True,
             )
         )
     )
     prices = [row.price for row in result]
 
     if not prices:
-        logger.warning("硬件 [%s] %s 无价格数据，跳过聚合", hardware.name, stat_date)
+        existing = await db.execute(
+            select(DailyStats).where(
+                and_(
+                    DailyStats.hardware_id == hardware.id,
+                    DailyStats.stat_date == stat_date,
+                )
+            )
+        )
+        stale_stats = existing.scalar_one_or_none()
+        if stale_stats is not None:
+            await db.delete(stale_stats)
+            await db.flush()
+            logger.info("硬件 [%s] %s 无有效样本，已删除旧聚合结果", hardware.name, stat_date)
+        else:
+            logger.warning("硬件 [%s] %s 无价格数据，跳过聚合", hardware.name, stat_date)
         return None
 
     # 拉取最近 30 天历史中位价，用于行情判断

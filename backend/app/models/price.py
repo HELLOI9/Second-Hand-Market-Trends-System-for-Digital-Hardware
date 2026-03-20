@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from sqlalchemy import String, Text, ForeignKey, Date, DateTime, Float, Integer, Enum
+from sqlalchemy import String, Text, Boolean, ForeignKey, Date, DateTime, Float, Integer, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -30,6 +30,10 @@ class PriceSnapshot(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     publish_time: Mapped[datetime | None] = mapped_column(DateTime)
     crawled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # LLM validation fields
+    is_valid: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
+    validation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     hardware: Mapped["HardwareItem"] = relationship(back_populates="price_snapshots")
 

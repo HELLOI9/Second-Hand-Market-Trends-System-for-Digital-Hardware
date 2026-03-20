@@ -86,9 +86,15 @@ pnpm install
 success "Frontend dependencies installed"
 cd "$SCRIPT_DIR"
 
-# ── 6. Database migrations ────────────────────────────────────
+# ── 6. LLM server (manual) ───────────────────────────────────
 
-info "Running database migrations..."
+info "[6/7] LLM server (llama.cpp) must be deployed separately."
+info "  Ensure it is running at: \$LLM_BASE_URL (default: http://localhost:8080)"
+info "  API must be OpenAI-compatible (/v1/chat/completions)"
+
+# ── 7. Database migrations ────────────────────────────────────
+
+info "[7/7] Running database migrations..."
 cd "$SCRIPT_DIR/backend"
 alembic upgrade head
 success "Migrations complete"

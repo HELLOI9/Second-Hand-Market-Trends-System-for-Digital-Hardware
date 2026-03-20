@@ -1,5 +1,5 @@
 """
-Goofish (闲鱼) crawler — based on spider.py (Firefox + mtop API interception)
+Goofish crawler — based on spider.py (Firefox + mtop API interception)
 
 Strategy:
 1. Launch Playwright Firefox (headless) with login cookies
