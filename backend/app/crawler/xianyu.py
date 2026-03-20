@@ -164,7 +164,7 @@ async def _parse_item(item: dict) -> RawItem | None:
 # ── Main crawl function ───────────────────────────────────────
 
 
-async def crawl_keyword(keyword: str, max_pages: int = 3) -> list[RawItem]:
+async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
     """
     Crawl goofish search results for a keyword using Firefox.
     Requires cookies.json for authenticated access.
