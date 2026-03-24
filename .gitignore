@@ -8,3 +8,4 @@ __pycache__/
 backend/cookies.json
 cookies.json
 .claude/
+.vscode/

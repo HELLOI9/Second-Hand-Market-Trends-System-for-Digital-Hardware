@@ -6,21 +6,21 @@ HARDWARE_POOL = [
     {"name": "U5-245K",       "category": "cpu", "search_keywords": "Ultra 5 245K"},
     {"name": "U5-245KF",      "category": "cpu", "search_keywords": "Ultra 5 245KF"},
     {"name": "i9-14900K",     "category": "cpu", "search_keywords": "i9 14900K"},
-    {"name": "i9-14900KF",    "category": "cpu", "search_keywords": "i9 14900KF"},
+    {"name": "i9-14900KF",    "category": "cpu", "search_keywords": "14900KF"},
     {"name": "i7-14700K",     "category": "cpu", "search_keywords": "i7 14700K"},
     {"name": "i7-14700KF",    "category": "cpu", "search_keywords": "i7 14700KF"},
     {"name": "i5-14600K",     "category": "cpu", "search_keywords": "i5 14600K"},
     {"name": "i5-14600KF",    "category": "cpu", "search_keywords": "i5 14600KF"},
-    {"name": "R9-9950X",      "category": "cpu", "search_keywords": "R9 9950X 散片"},
-    {"name": "R9-9900X",      "category": "cpu", "search_keywords": "R9 9900X 散片"},
-    {"name": "R7-9700X",      "category": "cpu", "search_keywords": "R7 9700X 散片"},
-    {"name": "R5-9600X",      "category": "cpu", "search_keywords": "R5 9600X 散片"},
-    {"name": "R5-9500F",      "category": "cpu", "search_keywords": "R5 9500F 散片"},
-    {"name": "R9-9950X3D",    "category": "cpu", "search_keywords": "R9 9950X3D 散片"},
-    {"name": "R7-9850X3D",    "category": "cpu", "search_keywords": "R7 9850X3D 散片"},
-    {"name": "R7-9800X3D",    "category": "cpu", "search_keywords": "R7 9800X3D 散片"},
-    {"name": "R7-7800X3D",    "category": "cpu", "search_keywords": "R7 7800X3D 散片"},
-    {"name": "R5-7500F",      "category": "cpu", "search_keywords": "R5 7500F 散片"},
+    {"name": "R9-9950X",      "category": "cpu", "search_keywords": "9950X"},
+    {"name": "R9-9900X",      "category": "cpu", "search_keywords": "9900X"},
+    {"name": "R7-9700X",      "category": "cpu", "search_keywords": "9700X"},
+    {"name": "R5-9600X",      "category": "cpu", "search_keywords": "9600X"},
+    {"name": "R5-9500F",      "category": "cpu", "search_keywords": "9500F"},
+    {"name": "R9-9950X3D",    "category": "cpu", "search_keywords": "9950X3D"},
+    {"name": "R7-9850X3D",    "category": "cpu", "search_keywords": "9850X3D"},
+    {"name": "R7-9800X3D",    "category": "cpu", "search_keywords": "9800X3D"},
+    {"name": "R7-7800X3D",    "category": "cpu", "search_keywords": "7800X3D"},
+    {"name": "R5-7500F",      "category": "cpu", "search_keywords": "7500F"},
 
     # === GPU - NVIDIA 新一代 ===
     {"name": "RTX 5090",        "category": "gpu", "search_keywords": "RTX 5090"},
@@ -46,7 +46,7 @@ HARDWARE_POOL = [
     {"name": "ARC B570",        "category": "gpu", "search_keywords": "Arc B570"},
 
     # === GPU - NVIDIA 主流 ===
-    {"name": "RTX 4090",        "category": "gpu", "search_keywords": "RTX 4090"},
+    {"name": "RTX 4090",        "category": "gpu", "search_keywords": "4090 24g"},
     {"name": "RTX 4080 Super",  "category": "gpu", "search_keywords": "RTX 4080 Super"},
     {"name": "RTX 4080",        "category": "gpu", "search_keywords": "RTX 4080"},
     {"name": "RTX 4070 TI Super","category": "gpu", "search_keywords": "RTX 4070 Ti Super"},
@@ -76,3 +76,16 @@ HARDWARE_POOL = [
     {"name": "PCIe 4.0 1TB",    "category": "ssd", "search_keywords": "PCIe 4.0 SSD 1TB 固态"},
     {"name": "PCIe 4.0 2TB",    "category": "ssd", "search_keywords": "PCIe 4.0 SSD 2TB 固态"},
 ]
+
+
+SEARCH_KEYWORDS_BY_NAME = {
+    item["name"]: item["search_keywords"]
+    for item in HARDWARE_POOL
+}
+
+
+def get_search_keywords(hardware_name: str) -> str:
+    try:
+        return SEARCH_KEYWORDS_BY_NAME[hardware_name]
+    except KeyError as exc:
+        raise KeyError(f"Hardware [{hardware_name}] not found in HARDWARE_POOL") from exc

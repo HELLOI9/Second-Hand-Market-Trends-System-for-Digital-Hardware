@@ -164,7 +164,48 @@ async def _parse_item(item: dict) -> RawItem | None:
 # ── Main crawl function ───────────────────────────────────────
 
 
-async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
+async def _wait_for_search_hit(
+    get_hit_count,
+    previous_count: int,
+    timeout: float = 15.0,
+) -> bool:
+    """Wait until a new search API response has been captured."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if get_hit_count() > previous_count:
+            return True
+        await asyncio.sleep(0.2)
+    return False
+
+
+async def _click_next_page(page: Page) -> bool:
+    """
+    Try several selectors because goofish pagination DOM is not stable.
+    Returns True if a next-page control was clicked.
+    """
+    selectors = [
+        "[class*='search-pagination-arrow-right']:not([disabled])",
+        "button[class*='arrow-right']:not([disabled])",
+        "button[aria-label*='下一页']:not([disabled])",
+        "button:has-text('下一页'):not([disabled])",
+        "div[role='button']:has-text('下一页')",
+    ]
+
+    for selector in selectors:
+        try:
+            locator = page.locator(selector).first
+            if await locator.count() == 0:
+                continue
+            await locator.scroll_into_view_if_needed(timeout=3000)
+            await locator.click(timeout=5000)
+            return True
+        except Exception:
+            continue
+
+    return False
+
+
+async def crawl_keyword(keyword: str, max_pages: int = 3) -> list[RawItem]:
     """
     Crawl goofish search results for a keyword using Firefox.
     Requires cookies.json for authenticated access.
@@ -174,6 +215,7 @@ async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
 
     proxy_url = os.environ.get("https_proxy") or os.environ.get("http_proxy")
     proxy = {"server": proxy_url} if proxy_url else None
+    search_hit_count = 0
 
     async with async_playwright() as p:
         browser = await p.firefox.launch(
@@ -190,10 +232,12 @@ async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
         page: Page = await context.new_page()
 
         async def on_response(response: Response) -> None:
+            nonlocal search_hit_count
             items = await _parse_response(response)
             if items:
+                search_hit_count += 1
                 results.extend(items)
-                logger.debug("Captured %d items from page", len(items))
+                logger.debug("Captured %d items from page, hit=%d", len(items), search_hit_count)
 
         page.on("response", on_response)
 
@@ -212,6 +256,8 @@ async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
             await page.click('button[type="submit"]')
 
             # Wait for search results XHR to complete (page 1)
+            if not await _wait_for_search_hit(lambda: search_hit_count, 0, timeout=20.0):
+                logger.warning("Search API did not return page 1 for [%s]", keyword)
             await page.wait_for_load_state("networkidle", timeout=20_000)
 
             # Dismiss ad popup if present
@@ -225,12 +271,13 @@ async def crawl_keyword(keyword: str, max_pages: int = 5) -> list[RawItem]:
 
             # Pages 2..max_pages
             for page_num in range(2, max_pages + 1):
-                next_btn = await page.query_selector(
-                    "[class*='search-pagination-arrow-right']:not([disabled])"
-                )
-                if not next_btn:
+                previous_hits = search_hit_count
+                if not await _click_next_page(page):
+                    logger.info("No usable next-page control found for [%s] at page %d", keyword, page_num - 1)
                     break
-                await next_btn.click()
+                if not await _wait_for_search_hit(lambda: search_hit_count, previous_hits, timeout=15.0):
+                    logger.info("No new search response after clicking next for [%s] page %d", keyword, page_num)
+                    break
                 await page.wait_for_load_state("networkidle", timeout=15_000)
                 logger.info("Crawling [%s] page %d", keyword, page_num)
 

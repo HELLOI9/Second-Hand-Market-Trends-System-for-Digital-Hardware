@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -12,7 +12,6 @@ class HardwareItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False)  # cpu / gpu / memory / ssd
-    search_keywords: Mapped[str] = mapped_column(Text, nullable=False)  # 闲鱼搜索关键词，逗号分隔
 
     # 关联
     price_snapshots: Mapped[list["PriceSnapshot"]] = relationship(back_populates="hardware", cascade="all, delete-orphan")

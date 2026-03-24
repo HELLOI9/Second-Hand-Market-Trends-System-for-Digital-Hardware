@@ -9,6 +9,7 @@ from datetime import date
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.hardware_pool import get_search_keywords
 from app.crawler import crawl_keyword
 from app.models import HardwareItem, PriceSnapshot
 from app.services.llm_validator import validate_snapshot_rows_sequential
@@ -56,8 +57,9 @@ async def run_full_crawl(db: AsyncSession) -> dict:
             continue
 
         try:
-            logger.info("开始爬取：%s (%s)", hw.name, hw.search_keywords)
-            raw_items = await crawl_keyword(hw.search_keywords)
+            search_keywords = get_search_keywords(hw.name)
+            logger.info("开始爬取：%s (%s)", hw.name, search_keywords)
+            raw_items = await crawl_keyword(search_keywords)
             saved = await save_snapshots(db, hw, raw_items, today)
             await db.commit()
             summary["success"] += 1
