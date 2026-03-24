@@ -153,7 +153,7 @@ psql postgresql://market:market_pass@localhost:5432/market -c "
 select h.name, p.price, p.is_valid, p.validation_reason, left(p.title, 80) as title
 from price_snapshots p
 join hardware_items h on h.id = p.hardware_id
-where h.name = 'i7-14700K'
+where h.name = 'PCIe 3.0 2TB'
   and p.snapshot_date = date '2026-03-24'
 order by p.id;
 "
