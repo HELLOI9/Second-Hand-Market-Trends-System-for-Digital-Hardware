@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://market:market_pass@localhost:5432/market"
     crawler_schedule: str = "0 2 * * *"
     debug: bool = False
-    llm_base_url: str = "http://localhost:8080"
-    llm_model: str = "qwen3.5-27b-q4_k_m"
+    llm_base_url: str = "http://localhost:8082"
+    llm_model: str = "Qwen3.5-9B-Q8_0.gguf"
 
     @field_validator("debug", mode="before")
     @classmethod
