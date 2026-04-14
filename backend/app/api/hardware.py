@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.hardware_pool import HARDWARE_POOL
 from app.core.database import get_db
 from app.models import HardwareItem, DailyStats
 from app.schemas.hardware import HardwareListItem, HardwareDetail, DailyStatsOut, TrendResponse, TrendPoint
@@ -12,13 +13,26 @@ from app.schemas.hardware import HardwareListItem, HardwareDetail, DailyStatsOut
 router = APIRouter(prefix="/hardware", tags=["hardware"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
+HARDWARE_ORDER = {
+    (item["category"], item["name"]): idx
+    for idx, item in enumerate(HARDWARE_POOL)
+}
+HARDWARE_ORDER_FALLBACK = len(HARDWARE_ORDER) + 10
 
 
 @router.get("", response_model=dict[str, list[HardwareDetail]])
 async def list_hardware(db: DbDep):
     """返回所有硬件（含最新统计），按分类分组"""
-    result = await db.execute(select(HardwareItem).order_by(HardwareItem.category, HardwareItem.name))
+    result = await db.execute(select(HardwareItem))
     items = result.scalars().all()
+    items.sort(
+        key=lambda item: (
+            HARDWARE_ORDER.get((item.category, item.name), HARDWARE_ORDER_FALLBACK),
+            item.category,
+            item.name,
+            item.id,
+        )
+    )
 
     # 批量拉取所有硬件的最新统计（子查询方式，避免 N+1）
     from sqlalchemy import func
