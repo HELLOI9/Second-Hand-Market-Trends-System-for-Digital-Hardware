@@ -1,10 +1,10 @@
 HARDWARE_POOL = [
     # === CPU ===
-    {"name": "U9-285K",       "category": "cpu", "search_keywords": "Ultra 9 285K"},
-    {"name": "U7-265K",       "category": "cpu", "search_keywords": "Ultra 7 265K"},
-    {"name": "U7-265KF",      "category": "cpu", "search_keywords": "Ultra 7 265KF"},
-    {"name": "U5-245K",       "category": "cpu", "search_keywords": "Ultra 5 245K"},
-    {"name": "U5-245KF",      "category": "cpu", "search_keywords": "Ultra 5 245KF"},
+    {"name": "Ultra 9 285K",       "category": "cpu", "search_keywords": "Ultra 9 285K"},
+    {"name": "Ultra 7 265K",       "category": "cpu", "search_keywords": "Ultra 7 265K"},
+    {"name": "Ultra 7 265KF",      "category": "cpu", "search_keywords": "Ultra 7 265KF"},
+    {"name": "Ultra 5 245K",       "category": "cpu", "search_keywords": "Ultra 5 245K"},
+    {"name": "Ultra 5 245KF",      "category": "cpu", "search_keywords": "Ultra 5 245KF"},
     {"name": "i9-14900K",     "category": "cpu", "search_keywords": "i9 14900K"},
     {"name": "i9-14900KF",    "category": "cpu", "search_keywords": "14900KF"},
     {"name": "i7-14700K",     "category": "cpu", "search_keywords": "i7 14700K"},
@@ -63,12 +63,12 @@ HARDWARE_POOL = [
     {"name": "RX 7600",         "category": "gpu", "search_keywords": "RX 7600"},
 
     # === 内存 ===
-    {"name": "DDR4 8GB*2",      "category": "memory", "search_keywords": "DDR4 8G 套条"},
-    {"name": "DDR4 16GB*2",     "category": "memory", "search_keywords": "DDR4 16G 套条"},
-    {"name": "DDR5 16GB*2",     "category": "memory", "search_keywords": "DDR5 16G 套条"},
-    {"name": "DDR5 24GB*2",     "category": "memory", "search_keywords": "DDR5 24G 套条"},
-    {"name": "DDR5 32GB*2",     "category": "memory", "search_keywords": "DDR5 32G 套条"},
-    {"name": "DDR5 48GB*2",     "category": "memory", "search_keywords": "DDR5 48G 套条"},
+    {"name": "DDR4 8GB*2",      "category": "memory", "search_keywords": "DDR4 8Gx2"},
+    {"name": "DDR4 16GB*2",     "category": "memory", "search_keywords": "DDR4 16Gx2"},
+    {"name": "DDR5 16GB*2",     "category": "memory", "search_keywords": "DDR5 16Gx2"},
+    {"name": "DDR5 24GB*2",     "category": "memory", "search_keywords": "DDR5 24Gx2"},
+    {"name": "DDR5 32GB*2",     "category": "memory", "search_keywords": "DDR5 32Gx2"},
+    {"name": "DDR5 48GB*2",     "category": "memory", "search_keywords": "DDR5 48Gx2"},
 
     # === 固态硬盘 ===
     {"name": "PCIe 3.0 1TB",    "category": "ssd", "search_keywords": "PCIe 3.0 SSD 1TB 固态"},

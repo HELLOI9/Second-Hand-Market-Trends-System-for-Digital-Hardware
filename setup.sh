@@ -14,6 +14,17 @@ success() { echo -e "${GREEN}[OK]${NC} $*"; }
 need_install() { ! command -v "$1" &>/dev/null; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
+DB_USER="${DB_USER:-market}"
+DB_NAME="${DB_NAME:-market}"
+DB_PASSWORD="${DB_PASSWORD:-}"
+
+if [ -z "$DB_PASSWORD" ]; then
+    DB_PASSWORD="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+    warn "DB_PASSWORD is not set; generated a random local password for role '${DB_USER}'."
+    warn "Please sync DATABASE_URL in your .env with this password after setup."
+fi
 
 info "========================================"
 info " Local Dev Environment Setup"
@@ -36,15 +47,15 @@ sudo systemctl enable postgresql --quiet
 
 # Create DB role and database (idempotent)
 info "Setting up database user and schema..."
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='market'" \
+sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" \
     | grep -q 1 \
-    || sudo -u postgres psql -c "CREATE USER market WITH PASSWORD 'market_pass';"
+    || sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';"
 
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='market'" \
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" \
     | grep -q 1 \
-    || sudo -u postgres psql -c "CREATE DATABASE market OWNER market;"
+    || sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
 
-success "Database 'market' ready"
+success "Database '${DB_NAME}' ready on ${DB_HOST}:${DB_PORT}"
 
 # ── 2. Python dependencies + Playwright ──────────────────────
 

@@ -173,12 +173,17 @@ backend/
 
 配置定义见 [config.py](/home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/backend/app/core/config.py)
 
-默认从仓库根目录 `.env` 读取。
+默认从仓库根目录 `.env` 读取，建议先从 `.env.example` 复制：
+
+```bash
+cp /home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/.env.example \
+   /home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/.env
+```
 
 常用项：
 
 ```env
-DATABASE_URL=postgresql+asyncpg://market:market_pass@localhost:5432/market
+DATABASE_URL=postgresql+asyncpg://<db_user>:<db_password>@localhost:5432/<db_name>
 CRAWLER_SCHEDULE=0 2 * * *
 LLM_BASE_URL=http://127.0.0.1:8082
 LLM_MODEL=Qwen3.5-9B-Q6_K.gguf
@@ -491,7 +496,13 @@ python rerun_one_hardware.py (--hardware-id <ID> | --hardware-name <NAME>) [--pa
 ```bash
 cd /home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/backend
 
-psql postgresql://market:market_pass@localhost:5432/market <<'SQL'
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=market
+export DB_NAME=market
+export PGPASSWORD='<your_db_password>'
+
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 TRUNCATE TABLE daily_stats RESTART IDENTITY CASCADE;
 TRUNCATE TABLE price_snapshots RESTART IDENTITY CASCADE;
 SQL
@@ -520,6 +531,16 @@ PY
 
 ## 10. 数据库查看命令
 
+先设置连接参数（示例）：
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=market
+export DB_NAME=market
+export PGPASSWORD='<your_db_password>'
+```
+
 ### 10.1 测试数据库连接
 
 ```bash
@@ -527,13 +548,13 @@ pg_isready -h localhost -p 5432
 ```
 
 ```bash
-psql postgresql://market:market_pass@localhost:5432/market -c 'select 1;'
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c 'select 1;'
 ```
 
 ### 10.2 查看某天原始样本量
 
 ```bash
-psql postgresql://market:market_pass@localhost:5432/market <<'SQL'
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 select snapshot_date, count(*) as snapshot_count
 from price_snapshots
 where snapshot_date = date '2026-03-24'
@@ -545,7 +566,7 @@ SQL
 ### 10.3 查看某个硬件某天的 valid/invalid 分布
 
 ```bash
-psql postgresql://market:market_pass@localhost:5432/market <<'SQL'
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 select h.name, p.snapshot_date, p.is_valid, count(*) as cnt
 from price_snapshots p
 join hardware_items h on h.id = p.hardware_id
@@ -559,7 +580,7 @@ SQL
 ### 10.4 查看某个硬件某天的标题和判定理由
 
 ```bash
-PAGER=cat psql postgresql://market:market_pass@localhost:5432/market <<'SQL'
+PAGER=cat psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 select h.name, p.price, p.is_valid, p.validation_reason, left(p.title, 80) as title
 from price_snapshots p
 join hardware_items h on h.id = p.hardware_id
@@ -572,7 +593,7 @@ SQL
 ### 10.5 查看聚合结果
 
 ```bash
-psql postgresql://market:market_pass@localhost:5432/market <<'SQL'
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 select h.name, d.stat_date, d.median_price, d.avg_price, d.sample_count, d.price_level
 from daily_stats d
 join hardware_items h on h.id = d.hardware_id

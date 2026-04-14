@@ -7,7 +7,7 @@ ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://market:market_pass@localhost:5432/market"
+    database_url: str = "postgresql+asyncpg://market@localhost:5432/market"
     crawler_schedule: str = "0 2 * * *"
     debug: bool = False
     llm_base_url: str = "http://localhost:8082"
