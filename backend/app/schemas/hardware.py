@@ -3,14 +3,6 @@ from pydantic import BaseModel
 from app.models.price import PriceLevel
 
 
-class HardwareListItem(BaseModel):
-    id: int
-    name: str
-    category: str
-
-    model_config = {"from_attributes": True}
-
-
 class DailyStatsOut(BaseModel):
     stat_date: date
     median_price: float

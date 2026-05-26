@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.hardware_pool import HARDWARE_POOL
 from app.core.database import get_db
 from app.models import HardwareItem, DailyStats
-from app.schemas.hardware import HardwareListItem, HardwareDetail, DailyStatsOut, TrendResponse, TrendPoint
+from app.schemas.hardware import HardwareDetail, DailyStatsOut, TrendResponse, TrendPoint
 
 router = APIRouter(prefix="/hardware", tags=["hardware"])
 

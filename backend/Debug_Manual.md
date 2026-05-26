@@ -25,7 +25,7 @@ backend/
 
 当前完整链路如下：
 
-1. 从 [hardware_pool.py](/home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/backend/app/core/hardware_pool.py) 读取固定硬件池
+1. 从 [hardware_pool.py](app/core/hardware_pool.py) 读取固定硬件池
 2. 根据 `hardware.name` 在 `hardware_pool.py` 中查对应的 `search_keywords`
 3. 用 `crawl_keyword()` 爬取闲鱼结果
 4. `save_snapshots()` 做第一层轻量规则过滤后写入 `price_snapshots`
@@ -52,8 +52,7 @@ python test_crawl.py <keyword> [--pages <N>]
 示例：
 
 ```bash
-cd /home/jwdeng/project/Second-Hand-Market-Trends-System-for-Digital-Hardware/backend
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python test_crawl.py "i7-14700K" --pages 3
+python test_crawl.py "i7-14700K" --pages 3
 ```
 
 ### 历史数据重跑 LLM
@@ -82,19 +81,19 @@ python revalidate.py [--hardware-id <ID> | --hardware-name <NAME>] [--date <YYYY
 示例：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python revalidate.py --hardware-name "RTX 4090" --date 2026-03-24 --limit 5 --verbose-llm
+python revalidate.py --hardware-name "RTX 4090" --date 2026-03-24 --limit 5 --verbose-llm
 ```
 
 全量未校验数据：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python revalidate.py
+python revalidate.py
 ```
 
 强制重跑：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python revalidate.py --force
+python revalidate.py --force
 ```
 
 ### 重跑今日某个硬件
@@ -123,22 +122,22 @@ python rerun_one_hardware.py (--hardware-id <ID> | --hardware-name <NAME>) [--pa
 示例：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python rerun_one_hardware.py --hardware-name "i7-14700K"
+python rerun_one_hardware.py --hardware-name "i7-14700K"
 ```
 
 指定页数：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python rerun_one_hardware.py --hardware-name "i7-14700K" --pages 3
+python rerun_one_hardware.py --hardware-name "i7-14700K" --pages 3
 ```
 
 打印 LLM 请求/响应：
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python rerun_one_hardware.py --hardware-name "i7-14700K" --verbose-llm
+python rerun_one_hardware.py --hardware-name "i7-14700K" --verbose-llm
 
 ### 清除整个数据库并重写硬件池（慎用！）
 
 ```bash
-/home/jwdeng/miniconda3/envs/Xianyu/bin/python reset_backend_data.py
+python reset_backend_data.py
 ```

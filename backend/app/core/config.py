@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     debug: bool = False
     llm_base_url: str = "http://localhost:8082"
     llm_model: str = "Qwen3.5-9B-Q8_0.gguf"
+    llm_api_key: str = ""
+    frontend_port: int = 8080
+    cors_origins: str = ""
 
     @field_validator("debug", mode="before")
     @classmethod
@@ -23,6 +26,15 @@ class Settings(BaseSettings):
             if lowered in {"debug", "dev", "development", "on", "true", "1", "yes"}:
                 return True
         return value
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        if self.cors_origins.strip():
+            return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [
+            f"http://localhost:{self.frontend_port}",
+            f"http://127.0.0.1:{self.frontend_port}",
+        ]
 
     class Config:
         env_file = str(ROOT_ENV_FILE)

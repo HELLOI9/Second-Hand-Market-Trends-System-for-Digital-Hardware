@@ -11,7 +11,7 @@
 
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
 from sqlalchemy import select, and_
@@ -305,7 +305,7 @@ async def save_snapshots(
             seller=item.seller,
             image_url=item.image_url,
             publish_time=item.publish_time,
-            crawled_at=datetime.utcnow(),
+            crawled_at=datetime.now(timezone.utc),
         ))
         existing_set.add(key)
         count += 1

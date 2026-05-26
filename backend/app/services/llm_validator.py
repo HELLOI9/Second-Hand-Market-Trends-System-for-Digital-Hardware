@@ -8,7 +8,6 @@ to determine if a crawled item title actually matches the target hardware.
 import asyncio
 import json
 import logging
-from datetime import date
 from typing import Any, Callable
 
 import httpx
@@ -72,6 +71,9 @@ async def _call_llm(
         "temperature": 0.1,
         "max_tokens": 51200,
     }
+    headers = {"Content-Type": "application/json"}
+    if settings.llm_api_key:
+        headers["Authorization"] = f"Bearer {settings.llm_api_key}"
 
     for attempt in range(MAX_RETRIES):
         try:
@@ -89,6 +91,7 @@ async def _call_llm(
             resp = await client.post(
                 f"{settings.llm_base_url}/v1/chat/completions",
                 json=request_payload,
+                headers=headers,
                 timeout=120.0,
             )
             resp.raise_for_status()
@@ -318,68 +321,6 @@ async def validate_batch(db: AsyncSession, limit: int = 100) -> dict[str, Any]:
     rows = result.all()
 
     return await _validate_rows(db, rows, commit=True)
-
-
-async def validate_snapshots(
-    db: AsyncSession,
-    *,
-    hardware_id: int,
-    snapshot_date: date,
-    only_unvalidated: bool = True,
-    commit: bool = False,
-    debug_hook: Callable[[dict[str, Any]], None] | None = None,
-) -> dict[str, Any]:
-    """
-    Validate snapshots for a specific hardware item on a specific date.
-    Used by the crawl pipeline so the same batch can be validated before aggregation.
-    """
-    stmt = (
-        select(PriceSnapshot, HardwareItem.name)
-        .join(HardwareItem, PriceSnapshot.hardware_id == HardwareItem.id)
-        .where(
-            PriceSnapshot.hardware_id == hardware_id,
-            PriceSnapshot.snapshot_date == snapshot_date,
-        )
-    )
-    if only_unvalidated:
-        stmt = stmt.where(PriceSnapshot.is_valid.is_(None))
-
-    result = await db.execute(stmt)
-    rows = result.all()
-    return await _validate_rows(db, rows, commit=commit, debug_hook=debug_hook)
-
-
-async def validate_filtered_snapshots(
-    db: AsyncSession,
-    *,
-    hardware_id: int | None = None,
-    snapshot_date: date | None = None,
-    only_unvalidated: bool = True,
-    limit: int | None = None,
-    commit: bool = True,
-    debug_hook: Callable[[dict[str, Any]], None] | None = None,
-) -> dict[str, Any]:
-    """
-    Validate snapshots using optional hardware/date filters.
-    Useful for backfilling historical data from scripts.
-    """
-    stmt = (
-        select(PriceSnapshot, HardwareItem.name)
-        .join(HardwareItem, PriceSnapshot.hardware_id == HardwareItem.id)
-    )
-
-    if hardware_id is not None:
-        stmt = stmt.where(PriceSnapshot.hardware_id == hardware_id)
-    if snapshot_date is not None:
-        stmt = stmt.where(PriceSnapshot.snapshot_date == snapshot_date)
-    if only_unvalidated:
-        stmt = stmt.where(PriceSnapshot.is_valid.is_(None))
-    if limit is not None:
-        stmt = stmt.limit(limit)
-
-    result = await db.execute(stmt)
-    rows = result.all()
-    return await _validate_rows(db, rows, commit=commit, debug_hook=debug_hook)
 
 
 async def get_validation_status(db: AsyncSession) -> dict[str, int]:

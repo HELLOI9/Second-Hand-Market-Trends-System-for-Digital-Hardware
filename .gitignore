@@ -10,3 +10,8 @@ cookies.json
 .claude/
 .vscode/
 .codex/
+
+# vue-tsc 误生成的产物
+frontend/src/**/*.js
+frontend/src/**/*.vue.js
+*.tsbuildinfo

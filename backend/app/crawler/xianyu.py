@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -45,7 +45,15 @@ def _load_cookies() -> list[dict]:
         logger.warning("cookies.json not found — running without login")
         return []
     try:
-        data = json.loads(COOKIE_FILE.read_text())
+        # POSIX 下若文件可被组/其他用户读取，发出警告（含登录凭据）
+        if os.name == "posix":
+            mode = COOKIE_FILE.stat().st_mode & 0o777
+            if mode & 0o077:
+                logger.warning(
+                    "cookies.json permissions are %o (recommend 600); contains login credentials",
+                    mode,
+                )
+        data = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
         logger.info("Loaded %d cookies", len(data))
         return data
     except Exception as e:
