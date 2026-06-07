@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from sqlalchemy import String, Text, Boolean, ForeignKey, Date, DateTime, Float, Integer, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
@@ -30,7 +30,7 @@ class PriceSnapshot(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     publish_time: Mapped[datetime | None] = mapped_column(DateTime)
     crawled_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime, nullable=False, default=datetime.utcnow
     )
 
     # LLM validation fields

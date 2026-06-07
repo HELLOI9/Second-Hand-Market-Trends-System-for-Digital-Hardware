@@ -1,28 +1,59 @@
-from datetime import date
+from datetime import date, datetime
+import asyncio
+import logging
+import threading
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, and_
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db, AsyncSessionLocal
-from app.models import DailyStats
+from app.models import CrawlRun, DailyStats
 from app.schemas.hardware import CrawlerStatus, CrawlerRunResponse
 from app.services import run_full_crawl
 from app.crawler.xianyu import crawl_keyword
 
 router = APIRouter(prefix="/crawler", tags=["crawler"])
+logger = logging.getLogger(__name__)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 # 最近一次爬取摘要（内存缓存，足够第一阶段使用）
 _last_summary: dict | None = None
+_crawl_lock = threading.Lock()
+_crawl_running = False
+_crawl_stop_event = threading.Event()
 
 
-async def _do_crawl():
+async def _do_crawl(force: bool = False):
     global _last_summary
     async with AsyncSessionLocal() as db:
-        _last_summary = await run_full_crawl(db)
+        _last_summary = await run_full_crawl(db, force=force, should_stop=_crawl_stop_event.is_set)
+
+
+async def _do_thread_crawl(force: bool = False):
+    global _last_summary
+    engine = create_async_engine(settings.database_url, echo=settings.debug)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with session_factory() as db:
+            _last_summary = await run_full_crawl(db, force=force, should_stop=_crawl_stop_event.is_set)
+    finally:
+        await engine.dispose()
+
+
+def _crawl_thread_entry(force: bool = False) -> None:
+    global _crawl_running
+    try:
+        asyncio.run(_do_thread_crawl(force))
+    except Exception:
+        logger.exception("手动采集任务异常退出")
+    finally:
+        with _crawl_lock:
+            _crawl_running = False
 
 
 @router.get("/status", response_model=CrawlerStatus)
@@ -39,11 +70,67 @@ async def get_status(db: DbDep):
     return CrawlerStatus(last_run_date=last_date, last_run_success=success, last_run_failed=failed)
 
 
+ACTIVE_RUN_STATUSES = ("running", "crawling", "validating", "aggregating")
+
+
 @router.post("/run", response_model=CrawlerRunResponse)
-async def trigger_crawl(background_tasks: BackgroundTasks):
+async def trigger_crawl(db: DbDep, force: bool = Query(False)):
     """手动触发一次完整爬取（异步后台执行）"""
-    background_tasks.add_task(_do_crawl)
-    return CrawlerRunResponse(status="started", summary={"message": "爬取任务已在后台启动"})
+    global _crawl_running
+    active_run = (
+        await db.execute(
+            select(CrawlRun)
+            .where(CrawlRun.status.in_(ACTIVE_RUN_STATUSES), CrawlRun.ended_at.is_(None))
+            .order_by(CrawlRun.started_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if active_run is not None:
+        return CrawlerRunResponse(
+            status="running",
+            summary={
+                "message": "已有采集任务正在运行，请等待完成后再开始新一轮监测",
+                "force": force,
+                "active_run_id": active_run.id,
+                "active_status": active_run.status,
+            },
+        )
+
+    with _crawl_lock:
+        if _crawl_running:
+            return CrawlerRunResponse(status="running", summary={"message": "已有采集任务正在运行", "force": force})
+        _crawl_stop_event.clear()
+        _crawl_running = True
+    threading.Thread(target=_crawl_thread_entry, args=(force,), daemon=True).start()
+    message = "强制真实采集任务已在后台启动" if force else "爬取任务已在后台启动"
+    return CrawlerRunResponse(status="started", summary={"message": message, "force": force})
+
+
+@router.post("/pause", response_model=CrawlerRunResponse)
+async def pause_crawl(db: DbDep):
+    """请求暂停当前采集任务。"""
+    _crawl_stop_event.set()
+    active_run = (
+        await db.execute(
+            select(CrawlRun)
+            .where(CrawlRun.status.in_(ACTIVE_RUN_STATUSES), CrawlRun.ended_at.is_(None))
+            .order_by(CrawlRun.started_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if active_run is None:
+        return CrawlerRunResponse(status="idle", summary={"message": "当前没有正在运行的采集任务"})
+
+    active_run.status = "interrupted"
+    active_run.ended_at = datetime.utcnow()
+    await db.commit()
+    return CrawlerRunResponse(
+        status="paused",
+        summary={
+            "message": "已请求暂停当前采集任务",
+            "active_run_id": active_run.id,
+        },
+    )
 
 
 @router.get("/test")

@@ -11,12 +11,13 @@
 
 import logging
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import numpy as np
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.crawler import RawItem
 from app.models import HardwareItem, PriceSnapshot, DailyStats
 from app.models.price import PriceLevel
@@ -295,7 +296,7 @@ async def save_snapshots(
         key = (item.title, item.price)
         if key in existing_set:
             continue
-        db.add(PriceSnapshot(
+        snapshot = PriceSnapshot(
             hardware_id=hardware.id,
             price=item.price,
             title=item.title,
@@ -305,8 +306,12 @@ async def save_snapshots(
             seller=item.seller,
             image_url=item.image_url,
             publish_time=item.publish_time,
-            crawled_at=datetime.now(timezone.utc),
-        ))
+            crawled_at=datetime.utcnow(),
+        )
+        if not settings.llm_validation_enabled:
+            snapshot.is_valid = True
+            snapshot.validation_reason = "LLM validation disabled"
+        db.add(snapshot)
         existing_set.add(key)
         count += 1
 

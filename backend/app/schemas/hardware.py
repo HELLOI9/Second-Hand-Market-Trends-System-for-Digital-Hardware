@@ -19,9 +19,25 @@ class HardwareDetail(BaseModel):
     id: int
     name: str
     category: str
+    search_keywords: list[str] = []
+    is_active: bool = True
     latest_stats: DailyStatsOut | None = None
 
     model_config = {"from_attributes": True}
+
+
+class HardwareCreate(BaseModel):
+    name: str
+    category: str
+    search_keywords: list[str] = []
+    cold_start: bool = True
+
+
+class HardwareUpdate(BaseModel):
+    name: str | None = None
+    category: str | None = None
+    search_keywords: list[str] | None = None
+    is_active: bool | None = None
 
 
 class TrendPoint(BaseModel):
@@ -39,6 +55,18 @@ class TrendResponse(BaseModel):
     hardware_name: str
     days: int
     trend: list[TrendPoint]
+
+
+class HardwareSampleOut(BaseModel):
+    id: int
+    price: float
+    title: str
+    item_url: str | None = None
+    area: str | None = None
+    seller: str | None = None
+    image_url: str | None = None
+    publish_time: str | None = None
+    snapshot_date: date
 
 
 class CrawlerStatus(BaseModel):
