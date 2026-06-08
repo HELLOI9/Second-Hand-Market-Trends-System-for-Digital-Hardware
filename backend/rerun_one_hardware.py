@@ -21,9 +21,9 @@ from datetime import date
 from sqlalchemy import delete, select
 
 from app.core.database import AsyncSessionLocal
-from app.core.hardware_pool import get_search_keywords
 from app.crawler.xianyu import crawl_keyword
 from app.models import DailyStats, HardwareItem, PriceSnapshot
+from app.services.hardware_pool_service import primary_keyword
 from app.services.llm_validator import validate_snapshot_rows_sequential
 from app.services.stats import compute_daily_stats, save_snapshots
 
@@ -138,7 +138,7 @@ async def main() -> None:
 
     async with AsyncSessionLocal() as session:
         hardware = await _resolve_hardware(session, args.hardware_id, args.hardware_name)
-        search_keywords = get_search_keywords(hardware.name)
+        search_keywords = primary_keyword(hardware)
 
         delete_stats = await session.execute(
             delete(DailyStats).where(

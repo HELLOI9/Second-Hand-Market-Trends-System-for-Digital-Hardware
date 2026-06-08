@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:8082"
     llm_model: str = "Qwen3.5-9B-Q8_0.gguf"
     llm_api_key: str = ""
+    llm_api_style: str = "chat_completions"
+    llm_validation_enabled: bool = True
+    admin_token: str = "dev-admin-token"
+    telegram_bot_token: str = ""
     frontend_port: int = 8080
     cors_origins: str = ""
 

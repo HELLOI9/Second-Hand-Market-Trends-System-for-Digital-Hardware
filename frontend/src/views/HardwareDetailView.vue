@@ -14,9 +14,9 @@
           </p>
         </div>
 
-        <el-tag v-if="hardware?.category" effect="dark" round>
-          {{ CATEGORY_LABELS[hardware.category] ?? hardware.category }}
-        </el-tag>
+        <el-button v-if="hardware" class="alert-btn" :icon="Bell" @click="subscribeHardware">
+          订阅提醒
+        </el-button>
       </div>
     </header>
 
@@ -70,6 +70,16 @@
               可信度：{{ analysisMetrics.confidenceLabel }}
             </span>
           </div>
+        </el-card>
+      </section>
+
+      <section v-else-if="hasTrendData" class="analysis-overview">
+        <el-card class="analysis-hero muted-analysis">
+          <div class="analysis-kicker">QUANT SNAPSHOT</div>
+          <h3 class="analysis-title">行情分析等待更多数据</h3>
+          <p class="analysis-summary">
+            当前只有 {{ analysisPoints.length }} 天历史数据，估值、趋势、波动和样本可信度需要连续采集至少 2 天后生成。
+          </p>
         </el-card>
       </section>
 
@@ -206,10 +216,72 @@
 
         <PriceTrendChart v-else :trend="trendData.trend" />
       </el-card>
+
+      <section class="recommend-section">
+        <div class="recommend-head">
+          <div>
+            <p>SELECTED ITEMS</p>
+            <h3>精选相关商品</h3>
+          </div>
+          <span v-if="recommendedSamples.length">{{ recommendedSamples.length }} 个最新有效样本</span>
+        </div>
+
+        <div v-if="sampleLoading" class="recommend-loading">
+          <el-skeleton :rows="5" animated />
+        </div>
+
+        <div v-else-if="recommendedSamples.length" class="recommend-grid">
+          <article v-for="item in recommendedSamples" :key="item.id" class="recommend-card">
+            <div class="item-image">
+              <img v-if="item.image_url" :src="item.image_url" :alt="item.title" loading="lazy" />
+              <div v-else class="image-placeholder">{{ hardware.name.slice(0, 2) }}</div>
+              <span v-if="recommendInfo(item).featured" class="featured-badge">精选</span>
+            </div>
+
+            <div class="recommend-body">
+              <h4>{{ item.title }}</h4>
+              <div class="price-line">
+                <strong>¥{{ formatPrice(item.price) }}</strong>
+                <span>{{ item.area || '暂无地区' }}</span>
+              </div>
+
+              <div class="match-box" :class="{ caution: !recommendInfo(item).recommended }">
+                <div class="match-title">
+                  <span>{{ recommendInfo(item).recommended ? '推荐关注' : '谨慎观察' }}</span>
+                  <strong>MATCH {{ recommendInfo(item).score }}%</strong>
+                </div>
+                <div class="match-track">
+                  <i :style="{ width: `${recommendInfo(item).score}%` }"></i>
+                </div>
+                <p>{{ recommendInfo(item).reason }}</p>
+              </div>
+
+              <div class="price-meta">
+                <div>
+                  <span>市场中位</span>
+                  <strong>¥{{ formatPrice(hardware.latest_stats?.median_price ?? item.price) }}</strong>
+                </div>
+                <div>
+                  <span>样本日期</span>
+                  <strong>{{ item.snapshot_date }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <footer class="recommend-footer">
+              <span>{{ item.seller || '未知卖家' }}</span>
+              <el-button v-if="item.item_url" text @click="openItem(item.item_url)">详情</el-button>
+              <span v-else>无链接</span>
+            </footer>
+          </article>
+        </div>
+
+        <el-empty v-else description="暂无精选相关商品" />
+      </section>
     </main>
 
     <div v-else-if="!loading" class="not-found">
-      <el-result icon="warning" title="硬件不存在" sub-title="请返回首页重新选择">
+      <el-result icon="warning" title="对象不存在" sub-title="请返回首页重新选择">
         <template #extra>
           <el-button @click="goBack">返回首页</el-button>
         </template>
@@ -222,21 +294,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Bell } from '@element-plus/icons-vue'
 import { hardwareApi } from '@/api'
-import type { HardwareDetail, TrendResponse, PriceLevel, TrendPoint } from '@/api/types'
+import type { HardwareDetail, TrendResponse, PriceLevel, TrendPoint, HardwareSample } from '@/api/types'
 import PriceTrendChart from '@/components/PriceTrendChart.vue'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
 const route = useRoute()
 
-const CATEGORY_LABELS: Record<string, string> = {
-  cpu: 'CPU',
-  gpu: '显卡',
-  memory: '内存',
-  ssd: '固态硬盘',
-}
-const VALID_CATEGORIES = new Set(Object.keys(CATEGORY_LABELS))
 const VALID_VIEWS = new Set(['heatmap', 'table', 'cards'])
 
 const LEVEL_LABELS: Record<PriceLevel, string> = {
@@ -250,7 +316,9 @@ const trendLoading = ref(false)
 const hardware = ref<HardwareDetail | null>(null)
 const trendData = ref<TrendResponse | null>(null)
 const analysisTrend = ref<TrendResponse | null>(null)
+const samples = ref<HardwareSample[]>([])
 const selectedDays = ref<7 | 30 | 90>(30)
+const sampleLoading = ref(false)
 
 type SignalLevel = 'low' | 'normal' | 'high'
 
@@ -289,14 +357,9 @@ function queryString(value: unknown): string | null {
 }
 
 function goBack() {
-  const fromCategory = queryString(route.query.fromCategory)
   const fromView = queryString(route.query.fromView)
 
   const query: Record<string, string> = {}
-
-  if (fromCategory && VALID_CATEGORIES.has(fromCategory)) {
-    query.category = fromCategory
-  }
 
   if (fromView && VALID_VIEWS.has(fromView)) {
     query.view = fromView
@@ -305,6 +368,15 @@ function goBack() {
   router.push({
     name: 'home',
     query,
+  })
+}
+
+function subscribeHardware() {
+  router.push({
+    name: 'alerts',
+    query: {
+      hardwareId: props.id,
+    },
   })
 }
 
@@ -428,6 +500,8 @@ const analysisPoints = computed(() => {
   return trendData.value?.trend ?? []
 })
 
+const hasTrendData = computed(() => analysisPoints.value.length > 0)
+
 const analysisMetrics = computed<AnalysisMetrics | null>(() => {
   const points = analysisPoints.value
   if (points.length < 2) return null
@@ -532,6 +606,66 @@ const sampleBarData = computed(() => {
   }))
 })
 
+const recommendedSamples = computed(() => {
+  return [...samples.value]
+    .sort((a, b) => recommendInfo(b).score - recommendInfo(a).score)
+    .slice(0, 8)
+})
+
+function recommendInfo(item: HardwareSample): { score: number; reason: string; recommended: boolean; featured: boolean } {
+  const median = hardware.value?.latest_stats?.median_price ?? item.price
+  const ratio = median > 0 ? item.price / median : 1
+  const diff = median > 0 ? ((item.price - median) / median) * 100 : 0
+  const title = item.title.toLowerCase()
+  const target = hardware.value?.name.toLowerCase() ?? ''
+  const targetTokens = target.split(/[\s\-_/]+/).filter((token) => token.length >= 2)
+  const matchedTokens = targetTokens.filter((token) => title.includes(token)).length
+
+  const riskyTerms = ['有偿', '教你', '方法', '带你', '定金', '订金', '维修', '负压', '优化', '教程', '链接', '咨询', '配件', '散热', '空盒', '盒子', '外壳']
+  const positiveTerms = ['全新', '自用', '原装', '国行', '在保', '保修', '箱说', '包邮', '成色', '正常', '无修', '无拆']
+  const riskHits = riskyTerms.filter((term) => title.includes(term))
+  const positiveHits = positiveTerms.filter((term) => title.includes(term))
+
+  const identityScore = clamp(
+    20
+    + (target && title.includes(target) ? 24 : 0)
+    + (targetTokens.length ? (matchedTokens / targetTokens.length) * 18 : 8),
+    8,
+    42,
+  )
+
+  let valueScore = 12
+  if (ratio <= 0.72) valueScore = 14
+  else if (ratio <= 0.86) valueScore = 28
+  else if (ratio <= 0.98) valueScore = 24
+  else if (ratio <= 1.08) valueScore = 18
+  else if (ratio <= 1.18) valueScore = 10
+  else valueScore = 4
+
+  const infoScore = (item.image_url ? 8 : 0) + (item.seller ? 6 : 0) + (item.area ? 4 : 0) + (item.item_url ? 3 : 0)
+  const qualityScore = clamp(positiveHits.length * 3, 0, 12)
+  const riskPenalty = clamp(riskHits.length * 10 + (ratio < 0.55 ? 16 : 0), 0, 40)
+  const score = Math.round(clamp(identityScore + valueScore + infoScore + qualityScore - riskPenalty, 18, 96))
+  const recommended = score >= 70 && riskHits.length <= 1
+
+  const priceText = diff <= -14
+    ? `价格明显低于中位价 ${Math.abs(diff).toFixed(1)}%，但需要重点核对标题和卖家信息。`
+    : diff <= -3
+      ? `价格低于市场中位约 ${Math.abs(diff).toFixed(1)}%，匹配度和信息完整度较好。`
+      : diff <= 8
+        ? `价格接近市场中位，建议结合成色、卖家和图片继续判断。`
+        : `价格高于市场中位约 ${diff.toFixed(1)}%，性价比一般。`
+  const riskText = riskHits.length ? ` 标题命中风险词：${riskHits.slice(0, 2).join('、')}。` : ''
+  const positiveText = positiveHits.length ? ` 可参考信息：${positiveHits.slice(0, 2).join('、')}。` : ''
+
+  return {
+    score,
+    reason: `${priceText}${riskText}${positiveText}`,
+    recommended,
+    featured: recommended && score >= 76,
+  }
+}
+
 async function loadTrend() {
   trendLoading.value = true
   try {
@@ -559,16 +693,32 @@ async function loadAnalysisTrend() {
   }
 }
 
+async function loadSamples() {
+  sampleLoading.value = true
+  try {
+    samples.value = await hardwareApi.samples(Number(props.id), 8)
+  } catch {
+    samples.value = []
+  } finally {
+    sampleLoading.value = false
+  }
+}
+
+function openItem(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 onMounted(async () => {
   try {
     const [detail] = await Promise.all([
       hardwareApi.detail(Number(props.id)),
       loadTrend(),
       loadAnalysisTrend(),
+      loadSamples(),
     ])
     hardware.value = detail
   } catch {
-    ElMessage.error('加载硬件信息失败')
+    ElMessage.error('加载对象信息失败')
   } finally {
     loading.value = false
   }
@@ -579,6 +729,7 @@ onMounted(async () => {
 .detail-page {
   min-height: 100vh;
   padding: 22px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
 }
 
 .detail-header {
@@ -587,10 +738,10 @@ onMounted(async () => {
 }
 
 .header-inner {
-  background: linear-gradient(136deg, #2f4b7c 0%, #355f8d 52%, #2a788e 100%);
-  border: 1px solid rgba(202, 218, 235, 0.62);
+  background: #05070d;
+  border: 1px solid rgba(202, 218, 235, 0.24);
   box-shadow: var(--paper-shadow);
-  border-radius: 20px;
+  border-radius: 8px;
   padding: 14px 18px;
   display: flex;
   align-items: center;
@@ -599,7 +750,8 @@ onMounted(async () => {
 }
 
 .back-btn {
-  color: #f3f7fb;
+  color: #f3f7fb !important;
+  background: transparent !important;
   border-radius: 999px;
   border: 1px solid rgba(229, 237, 245, 0.5);
   padding: 6px 12px;
@@ -607,6 +759,17 @@ onMounted(async () => {
 
 .back-btn:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+
+.alert-btn {
+  border-color: rgba(229, 237, 245, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  color: #f3f7fb;
+}
+
+.alert-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
 }
 
 .title-wrap {
@@ -644,17 +807,18 @@ onMounted(async () => {
 }
 
 .analysis-hero {
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--paper-border);
-  background:
-    radial-gradient(circle at 8% -40%, rgba(65, 68, 135, 0.16) 0%, transparent 42%),
-    radial-gradient(circle at 92% 140%, rgba(42, 120, 142, 0.13) 0%, transparent 46%),
-    linear-gradient(160deg, #fbfcfe 0%, #f5f8fb 100%);
-  box-shadow: 0 12px 24px rgba(31, 41, 55, 0.07);
+  background: #ffffff;
+  box-shadow: var(--paper-shadow);
 }
 
 .analysis-hero :deep(.el-card__body) {
   padding: 16px 18px 18px;
+}
+
+.muted-analysis {
+  background: #fbfcfe;
 }
 
 .analysis-kicker {
@@ -702,9 +866,9 @@ onMounted(async () => {
 }
 
 .analysis-chip.chip-normal {
-  color: #1c4c87;
-  border-color: rgba(61, 112, 184, 0.36);
-  background: rgba(61, 112, 184, 0.14);
+  color: #101b31;
+  border-color: rgba(16, 27, 49, 0.34);
+  background: rgba(16, 27, 49, 0.08);
 }
 
 .analysis-chip.chip-high {
@@ -715,22 +879,22 @@ onMounted(async () => {
 
 .analysis-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
 .analysis-card {
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--paper-border);
-  box-shadow: 0 10px 20px rgba(31, 41, 55, 0.06);
+  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.05);
 }
 
 .analysis-card :deep(.el-card__body) {
-  padding: 14px 16px;
+  padding: 13px 14px;
 }
 
 .analysis-card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--paper-text);
   margin-bottom: 6px;
@@ -746,7 +910,7 @@ onMounted(async () => {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  padding: 7px 0;
+  padding: 6px 0;
   border-bottom: 1px dashed rgba(127, 138, 153, 0.26);
 }
 
@@ -755,19 +919,19 @@ onMounted(async () => {
 }
 
 .metric-key {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--paper-muted);
 }
 
 .metric-val {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.3;
   font-weight: 700;
   color: var(--paper-text);
 }
 
 .metric-val.tone-up {
-  color: #1f6fb9;
+  color: #101b31;
 }
 
 .metric-val.tone-down {
@@ -797,7 +961,7 @@ onMounted(async () => {
 .confidence-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: linear-gradient(90deg, #3c67a3 0%, #2a788e 60%, #22a884 100%);
+  background: #05070d;
 }
 
 .confidence-text {
@@ -823,7 +987,7 @@ onMounted(async () => {
 .sample-bar {
   width: 100%;
   border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, rgba(61, 112, 184, 0.92) 0%, rgba(42, 120, 142, 0.78) 100%);
+  background: #05070d;
 }
 
 .sample-caption {
@@ -833,9 +997,9 @@ onMounted(async () => {
 }
 
 .stat-card {
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--paper-border);
-  box-shadow: 0 8px 18px rgba(31, 41, 55, 0.07);
+  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.05);
 }
 
 .stat-card :deep(.el-card__body) {
@@ -856,7 +1020,7 @@ onMounted(async () => {
 }
 
 .stat-value.emphasize {
-  color: var(--v2);
+  color: #101b31;
 }
 
 .sep {
@@ -865,9 +1029,9 @@ onMounted(async () => {
 }
 
 .chart-card {
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--paper-border);
-  box-shadow: 0 12px 26px rgba(31, 41, 55, 0.08);
+  box-shadow: var(--paper-shadow);
 }
 
 .chart-card :deep(.el-card__header) {
@@ -885,6 +1049,262 @@ onMounted(async () => {
 .chart-loading,
 .chart-empty {
   padding: 24px;
+}
+
+.recommend-section {
+  border: 1px solid var(--paper-border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--paper-shadow);
+  overflow: hidden;
+}
+
+.recommend-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 18px 12px;
+}
+
+.recommend-head p {
+  color: var(--paper-subtle);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.recommend-head h3 {
+  margin-top: 5px;
+  color: var(--paper-text);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.recommend-head > span {
+  color: var(--paper-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recommend-loading {
+  padding: 18px;
+}
+
+.recommend-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 18px 18px;
+}
+
+.recommend-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e8edf4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.06);
+}
+
+.item-image {
+  position: relative;
+  aspect-ratio: 1.24 / 1;
+  overflow: hidden;
+  background: #eef3f8;
+}
+
+.item-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7b8798;
+  font-size: 32px;
+  font-weight: 950;
+  background:
+    linear-gradient(135deg, rgba(16, 27, 49, 0.08), rgba(22, 132, 95, 0.12)),
+    #f6f9fc;
+}
+
+.featured-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #55c18c;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 26px;
+}
+
+.recommend-body {
+  padding: 14px 14px 12px;
+  flex: 1;
+}
+
+.recommend-body h4 {
+  min-height: 48px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #1d2738;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.price-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.price-line strong {
+  color: #d9445d;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.price-line span {
+  color: #9aa7b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.match-box {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(85, 193, 140, 0.2);
+  border-radius: 8px;
+  background: rgba(85, 193, 140, 0.1);
+}
+
+.match-box.caution {
+  border-color: rgba(217, 68, 93, 0.16);
+  background: rgba(217, 68, 93, 0.08);
+}
+
+.match-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #229765;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.match-box.caution .match-title {
+  color: #d9445d;
+}
+
+.match-title strong {
+  color: inherit;
+}
+
+.match-track {
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.match-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #55c18c;
+}
+
+.match-box.caution .match-track i {
+  background: #d9445d;
+}
+
+.match-box p {
+  min-height: 40px;
+  margin-top: 9px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #526174;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.price-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.price-meta div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.price-meta span {
+  display: block;
+  color: #9aa7b8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.price-meta strong {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #26364d;
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommend-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid #eef2f7;
+  color: #9aa7b8;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.recommend-footer span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommend-footer :deep(.el-button) {
+  color: #101b31;
+  font-weight: 950;
 }
 
 .not-found {
@@ -911,6 +1331,17 @@ onMounted(async () => {
 
   .analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .recommend-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .analysis-grid,
+  .recommend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

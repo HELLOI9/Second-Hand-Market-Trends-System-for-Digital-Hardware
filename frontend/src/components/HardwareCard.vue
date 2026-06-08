@@ -1,7 +1,7 @@
 <template>
   <el-card class="hardware-card" :class="levelClass" shadow="never" @click="emit('click')">
     <div class="card-header">
-      <span class="category-pill">{{ categoryLabel }}</span>
+      <span class="object-pill">监测对象</span>
       <span class="level-pill" v-if="latestStats">{{ levelLabel }}</span>
     </div>
 
@@ -36,13 +36,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{ click: [] }>()
 
-const CATEGORY_LABELS: Record<string, string> = {
-  cpu: 'CPU',
-  gpu: '显卡',
-  memory: '内存',
-  ssd: '固态',
-}
-
 const latestStats = computed(() => props.item.latest_stats ?? null)
 
 const levelClass = computed(() => {
@@ -55,8 +48,6 @@ const levelClass = computed(() => {
       return 'level-normal'
   }
 })
-
-const categoryLabel = computed(() => CATEGORY_LABELS[props.item.category] ?? props.item.category)
 
 const levelLabel = computed(() => {
   switch (latestStats.value?.price_level) {
@@ -77,17 +68,17 @@ function formatPrice(price: number): string {
 <style scoped>
 .hardware-card {
   cursor: pointer;
-  border-radius: 18px;
+  border-radius: 8px;
   border: 1px solid var(--paper-border);
-  background: linear-gradient(170deg, var(--paper-surface), var(--paper-surface-soft));
-  box-shadow: 0 10px 22px rgba(31, 41, 55, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .hardware-card:hover {
-  transform: translateY(-4px);
   border-color: var(--paper-border-strong);
-  box-shadow: 0 14px 28px rgba(31, 41, 55, 0.12);
+  background: #fbfdff;
+  box-shadow: 0 18px 34px rgba(16, 27, 49, 0.09);
 }
 
 .hardware-card :deep(.el-card__body) {
@@ -101,26 +92,26 @@ function formatPrice(price: number): string {
   margin-bottom: 12px;
 }
 
-.category-pill,
+.object-pill,
 .level-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 24px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 700;
 }
 
-.category-pill {
-  color: var(--v2);
+.object-pill {
+  color: #101b31;
   background: var(--v-soft-1);
 }
 
 .level-pill {
-  color: var(--paper-muted);
-  background: rgba(83, 97, 112, 0.12);
+  color: #047857;
+  background: #dff8ee;
 }
 
 .name {
@@ -142,7 +133,7 @@ function formatPrice(price: number): string {
   font-size: 28px;
   line-height: 1;
   font-weight: 700;
-  color: var(--v2);
+  color: #101b31;
 }
 
 .price-label {

@@ -1,5 +1,10 @@
 <template>
-  <v-chart :option="chartOption" style="height: 380px" autoresize />
+  <div class="trend-chart-wrap">
+    <div v-if="isSinglePoint" class="single-day-note">
+      当前只有 1 天历史数据，先展示当日价格点；连续采集 2 天以上后会形成趋势线。
+    </div>
+    <v-chart :option="chartOption" style="height: 380px" autoresize />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -25,6 +30,8 @@ const SERIES_COLORS = {
   min: '#2f9e44',
   max: '#7b5fc9',
 }
+
+const isSinglePoint = computed(() => props.trend.length === 1)
 
 function formatPriceTick(val: number): string {
   return val >= 10000 ? `${(val / 10000).toFixed(1)}万` : Math.round(val).toLocaleString()
@@ -55,8 +62,8 @@ const chartOption = computed(() => {
   const yMax = yMaxBase >= 1000 ? Math.ceil(yMaxBase / 50) * 50 : Math.ceil(yMaxBase)
 
   const onePoint = timestamps.length === 1
-  const xMin = onePoint ? timestamps[0] - 12 * 60 * 60 * 1000 : 'dataMin'
-  const xMax = onePoint ? timestamps[0] + 12 * 60 * 60 * 1000 : 'dataMax'
+  const xMin = onePoint ? timestamps[0] - 36 * 60 * 60 * 1000 : 'dataMin'
+  const xMax = onePoint ? timestamps[0] + 36 * 60 * 60 * 1000 : 'dataMax'
 
   return {
     color: [SERIES_COLORS.median, SERIES_COLORS.avg, SERIES_COLORS.min, SERIES_COLORS.max],
@@ -151,7 +158,9 @@ const chartOption = computed(() => {
         smooth: false,
         lineStyle: { width: 3.2 },
         areaStyle: { color: 'rgba(29, 78, 137, 0.1)' },
-        showSymbol: false,
+        showSymbol: onePoint,
+        symbol: 'circle',
+        symbolSize: onePoint ? 12 : 7,
         emphasis: { focus: 'series' },
         z: 4,
       },
@@ -161,7 +170,9 @@ const chartOption = computed(() => {
         data: avgs,
         smooth: false,
         lineStyle: { width: 2.4, type: 'dashed' },
-        showSymbol: false,
+        showSymbol: onePoint,
+        symbol: 'circle',
+        symbolSize: onePoint ? 11 : 6,
         emphasis: { focus: 'series' },
         z: 3,
       },
@@ -171,7 +182,9 @@ const chartOption = computed(() => {
         data: mins,
         smooth: false,
         lineStyle: { width: 1.5, type: 'dotted' },
-        showSymbol: false,
+        showSymbol: onePoint,
+        symbol: 'circle',
+        symbolSize: onePoint ? 10 : 5,
         emphasis: { focus: 'series' },
         z: 2,
       },
@@ -181,7 +194,9 @@ const chartOption = computed(() => {
         data: maxs,
         smooth: false,
         lineStyle: { width: 1.7, type: 'dashdot' },
-        showSymbol: false,
+        showSymbol: onePoint,
+        symbol: 'circle',
+        symbolSize: onePoint ? 10 : 5,
         emphasis: { focus: 'series' },
         z: 1,
       },
@@ -189,3 +204,22 @@ const chartOption = computed(() => {
   }
 })
 </script>
+
+<style scoped>
+.trend-chart-wrap {
+  position: relative;
+}
+
+.single-day-note {
+  position: absolute;
+  top: 2px;
+  left: 7%;
+  z-index: 1;
+  border-radius: 999px;
+  background: #f5f7fb;
+  color: #64748b;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+</style>

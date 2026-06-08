@@ -51,6 +51,66 @@ VALIDATION_PROMPT = """/no_think
 """
 
 
+def _chat_completions_url() -> str:
+    base_url = settings.llm_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return f"{base_url}/chat/completions"
+    return f"{base_url}/v1/chat/completions"
+
+
+def _llm_url() -> str:
+    base_url = settings.llm_base_url.rstrip("/")
+    if settings.llm_api_style == "responses":
+        return f"{base_url}/responses"
+    return _chat_completions_url()
+
+
+def _request_payload(prompt: str) -> dict[str, Any]:
+    if settings.llm_api_style == "responses":
+        return {
+            "model": settings.llm_model,
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": prompt,
+                        }
+                    ],
+                }
+            ],
+            "temperature": 0.1,
+        }
+    return {
+        "model": settings.llm_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 51200,
+    }
+
+
+def _response_text(data: dict[str, Any]) -> str:
+    if settings.llm_api_style != "responses":
+        return data["choices"][0]["message"]["content"].strip()
+
+    if isinstance(data.get("output_text"), str):
+        return data["output_text"].strip()
+
+    chunks: list[str] = []
+    for output in data.get("output", []):
+        if output.get("type") != "message":
+            continue
+        for content in output.get("content", []):
+            text = content.get("text")
+            if isinstance(text, str):
+                chunks.append(text)
+    if chunks:
+        return "".join(chunks).strip()
+
+    raise KeyError("output_text")
+
+
 def _emit_debug(debug_hook: Callable[[dict[str, Any]], None] | None, payload: dict[str, Any]) -> None:
     if debug_hook is not None:
         debug_hook(payload)
@@ -65,12 +125,8 @@ async def _call_llm(
 ) -> tuple[bool | None, str]:
     """Call LLM via OpenAI-compatible API to validate a single item title. Returns (is_valid, reason)."""
     prompt = VALIDATION_PROMPT.format(hardware_name=hardware_name, title=title)
-    request_payload = {
-        "model": settings.llm_model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,
-        "max_tokens": 51200,
-    }
+    url = _llm_url()
+    request_payload = _request_payload(prompt)
     headers = {"Content-Type": "application/json"}
     if settings.llm_api_key:
         headers["Authorization"] = f"Bearer {settings.llm_api_key}"
@@ -84,19 +140,19 @@ async def _call_llm(
                     "attempt": attempt + 1,
                     "hardware_name": hardware_name,
                     "title": title,
-                    "url": f"{settings.llm_base_url}/v1/chat/completions",
+                    "url": url,
                     "payload": request_payload,
                 },
             )
             resp = await client.post(
-                f"{settings.llm_base_url}/v1/chat/completions",
+                url,
                 json=request_payload,
                 headers=headers,
                 timeout=120.0,
             )
             resp.raise_for_status()
             data = resp.json()
-            text = data["choices"][0]["message"]["content"].strip()
+            text = _response_text(data)
             _emit_debug(
                 debug_hook,
                 {
@@ -110,7 +166,7 @@ async def _call_llm(
                 },
             )
 
-            result = json.loads(text)
+            result = json.loads(text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip())
             is_valid = bool(result.get("valid", False))
             reason = str(result.get("reason", ""))[:100]
             _emit_debug(
@@ -265,6 +321,7 @@ async def validate_snapshot_rows_sequential(
     *,
     commit_each: bool = True,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Validate snapshot rows one by one in order."""
     summary = {"validated": 0, "valid": 0, "invalid": 0, "failed": 0}
@@ -275,6 +332,10 @@ async def validate_snapshot_rows_sequential(
 
     async with httpx.AsyncClient() as client:
         for snapshot, hardware_name in rows:
+            if should_stop is not None and should_stop():
+                logger.info("Sequential validation interrupted by stop request")
+                break
+
             is_valid, reason = await _call_llm(
                 client,
                 snapshot.title,

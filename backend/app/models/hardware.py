@@ -1,4 +1,6 @@
-from sqlalchemy import String
+from datetime import datetime
+
+from sqlalchemy import ARRAY, Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -12,6 +14,10 @@ class HardwareItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False)  # cpu / gpu / memory / ssd
+    search_keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # 关联
     price_snapshots: Mapped[list["PriceSnapshot"]] = relationship(back_populates="hardware", cascade="all, delete-orphan")
