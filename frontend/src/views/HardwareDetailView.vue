@@ -53,7 +53,7 @@
 
       <section v-if="analysisMetrics" class="analysis-overview">
         <el-card class="analysis-hero">
-          <div class="analysis-kicker">QUANT SNAPSHOT</div>
+          <div class="analysis-kicker">量化快照</div>
           <h3 class="analysis-title">行情分析结论</h3>
           <p class="analysis-summary">{{ analysisSummary }}</p>
           <div class="analysis-chip-row">
@@ -66,7 +66,7 @@
             <span class="analysis-chip" :class="`chip-${analysisMetrics.riskLevel}`">
               风险：{{ analysisMetrics.riskLabel }}
             </span>
-            <span class="analysis-chip" :class="`chip-${analysisMetrics.confidenceLevel}`">
+            <span class="analysis-chip confidence-chip" :class="`confidence-${analysisMetrics.confidenceLevel}`">
               可信度：{{ analysisMetrics.confidenceLabel }}
             </span>
           </div>
@@ -75,7 +75,7 @@
 
       <section v-else-if="hasTrendData" class="analysis-overview">
         <el-card class="analysis-hero muted-analysis">
-          <div class="analysis-kicker">QUANT SNAPSHOT</div>
+          <div class="analysis-kicker">量化快照</div>
           <h3 class="analysis-title">行情分析等待更多数据</h3>
           <p class="analysis-summary">
             当前只有 {{ analysisPoints.length }} 天历史数据，估值、趋势、波动和样本可信度需要连续采集至少 2 天后生成。
@@ -220,7 +220,7 @@
       <section class="recommend-section">
         <div class="recommend-head">
           <div>
-            <p>SELECTED ITEMS</p>
+            <p>参考样本</p>
             <h3>精选相关商品</h3>
           </div>
           <span v-if="recommendedSamples.length">{{ recommendedSamples.length }} 个最新有效样本</span>
@@ -231,7 +231,13 @@
         </div>
 
         <div v-else-if="recommendedSamples.length" class="recommend-grid">
-          <article v-for="item in recommendedSamples" :key="item.id" class="recommend-card">
+          <article
+            v-for="item in recommendedSamples"
+            :key="item.id"
+            class="recommend-card"
+            :class="{ clickable: Boolean(item.item_url) }"
+            @click="item.item_url && openItem(item.item_url)"
+          >
             <div class="item-image">
               <img v-if="item.image_url" :src="item.image_url" :alt="item.title" loading="lazy" />
               <div v-else class="image-placeholder">{{ hardware.name.slice(0, 2) }}</div>
@@ -248,7 +254,7 @@
               <div class="match-box" :class="{ caution: !recommendInfo(item).recommended }">
                 <div class="match-title">
                   <span>{{ recommendInfo(item).recommended ? '推荐关注' : '谨慎观察' }}</span>
-                  <strong>MATCH {{ recommendInfo(item).score }}%</strong>
+                  <strong>匹配度 {{ recommendInfo(item).score }}%</strong>
                 </div>
                 <div class="match-track">
                   <i :style="{ width: `${recommendInfo(item).score}%` }"></i>
@@ -270,7 +276,7 @@
 
             <footer class="recommend-footer">
               <span>{{ item.seller || '未知卖家' }}</span>
-              <el-button v-if="item.item_url" text @click="openItem(item.item_url)">详情</el-button>
+              <el-button v-if="item.item_url" text @click.stop="openItem(item.item_url)">详情</el-button>
               <span v-else>无链接</span>
             </footer>
           </article>
@@ -729,7 +735,7 @@ onMounted(async () => {
 .detail-page {
   min-height: 100vh;
   padding: 22px;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
+  background: var(--layout-page-gradient);
 }
 
 .detail-header {
@@ -738,38 +744,38 @@ onMounted(async () => {
 }
 
 .header-inner {
-  background: #05070d;
-  border: 1px solid rgba(202, 218, 235, 0.24);
-  box-shadow: var(--paper-shadow);
-  border-radius: 8px;
+  background: var(--detail-hero-panel-bg);
+  border: 1px solid var(--detail-card-border);
+  box-shadow: var(--detail-panel-shadow);
+  border-radius: 18px;
   padding: 14px 18px;
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #eef4ff;
+  color: var(--detail-hero-text);
 }
 
 .back-btn {
-  color: #f3f7fb !important;
-  background: transparent !important;
+  color: var(--detail-hero-text) !important;
+  background: var(--detail-hero-button-bg) !important;
   border-radius: 999px;
-  border: 1px solid rgba(229, 237, 245, 0.5);
+  border: 1px solid var(--detail-hero-button-border);
   padding: 6px 12px;
 }
 
 .back-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--detail-hero-button-bg-hover) !important;
 }
 
 .alert-btn {
-  border-color: rgba(229, 237, 245, 0.5);
-  background: rgba(255, 255, 255, 0.12);
-  color: #f3f7fb;
+  border-color: var(--detail-hero-button-border);
+  background: var(--detail-hero-button-bg);
+  color: var(--detail-hero-text);
 }
 
 .alert-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
+  background: var(--detail-hero-button-bg-hover);
+  color: var(--detail-hero-text);
 }
 
 .title-wrap {
@@ -785,7 +791,7 @@ onMounted(async () => {
 .subtitle {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(236, 242, 248, 0.92);
+  color: var(--detail-hero-muted);
 }
 
 .content {
@@ -807,10 +813,9 @@ onMounted(async () => {
 }
 
 .analysis-hero {
-  border-radius: 8px;
-  border: 1px solid var(--paper-border);
-  background: #ffffff;
-  box-shadow: var(--paper-shadow);
+  border: 1px solid var(--detail-card-border);
+  background: var(--detail-hero-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
 }
 
 .analysis-hero :deep(.el-card__body) {
@@ -818,7 +823,7 @@ onMounted(async () => {
 }
 
 .muted-analysis {
-  background: #fbfcfe;
+  background: var(--detail-panel-bg);
 }
 
 .analysis-kicker {
@@ -853,28 +858,46 @@ onMounted(async () => {
   align-items: center;
   height: 28px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 700;
   border: 1px solid transparent;
 }
 
 .analysis-chip.chip-low {
-  color: #1d5f3a;
+  color: var(--chip-low-text);
   border-color: rgba(72, 160, 120, 0.36);
-  background: rgba(72, 160, 120, 0.14);
+  background: var(--chip-low-bg);
 }
 
 .analysis-chip.chip-normal {
-  color: #101b31;
+  color: var(--chip-normal-text);
   border-color: rgba(16, 27, 49, 0.34);
-  background: rgba(16, 27, 49, 0.08);
+  background: var(--chip-normal-bg);
 }
 
 .analysis-chip.chip-high {
-  color: #5a3d95;
+  color: var(--chip-high-text);
   border-color: rgba(108, 83, 170, 0.36);
-  background: rgba(108, 83, 170, 0.14);
+  background: var(--chip-high-bg);
+}
+
+.analysis-chip.confidence-chip.confidence-high {
+  color: var(--chip-low-text);
+  border-color: rgba(72, 160, 120, 0.36);
+  background: var(--chip-low-bg);
+}
+
+.analysis-chip.confidence-chip.confidence-normal {
+  color: var(--chip-high-text);
+  border-color: rgba(214, 170, 38, 0.32);
+  background: var(--chip-high-bg);
+}
+
+.analysis-chip.confidence-chip.confidence-low {
+  color: var(--text-danger);
+  border-color: rgba(217, 68, 93, 0.26);
+  background: rgba(217, 68, 93, 0.1);
 }
 
 .analysis-grid {
@@ -884,9 +907,9 @@ onMounted(async () => {
 }
 
 .analysis-card {
-  border-radius: 8px;
-  border: 1px solid var(--paper-border);
-  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.05);
+  border: 1px solid var(--detail-card-border);
+  background: var(--detail-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
 }
 
 .analysis-card :deep(.el-card__body) {
@@ -911,7 +934,7 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 10px;
   padding: 6px 0;
-  border-bottom: 1px dashed rgba(127, 138, 153, 0.26);
+  border-bottom: 1px dashed var(--detail-row-border);
 }
 
 .metric-row:last-child {
@@ -931,11 +954,11 @@ onMounted(async () => {
 }
 
 .metric-val.tone-up {
-  color: #101b31;
+  color: var(--text-strong);
 }
 
 .metric-val.tone-down {
-  color: #8b4f5a;
+  color: var(--text-danger);
 }
 
 .metric-val.tone-neutral {
@@ -953,15 +976,15 @@ onMounted(async () => {
   position: relative;
   flex: 1;
   height: 6px;
-  border-radius: 999px;
-  background: rgba(193, 200, 209, 0.5);
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
   overflow: hidden;
 }
 
 .confidence-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  background: #05070d;
+  background: linear-gradient(90deg, var(--accent-primary) 0%, var(--chart-series-avg) 100%);
 }
 
 .confidence-text {
@@ -987,7 +1010,7 @@ onMounted(async () => {
 .sample-bar {
   width: 100%;
   border-radius: 4px 4px 2px 2px;
-  background: #05070d;
+  background: linear-gradient(180deg, var(--chart-series-avg) 0%, var(--accent-primary) 100%);
 }
 
 .sample-caption {
@@ -997,9 +1020,9 @@ onMounted(async () => {
 }
 
 .stat-card {
-  border-radius: 8px;
-  border: 1px solid var(--paper-border);
-  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.05);
+  border: 1px solid var(--detail-card-border);
+  background: var(--detail-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
 }
 
 .stat-card :deep(.el-card__body) {
@@ -1020,7 +1043,7 @@ onMounted(async () => {
 }
 
 .stat-value.emphasize {
-  color: #101b31;
+  color: var(--text-strong);
 }
 
 .sep {
@@ -1029,9 +1052,9 @@ onMounted(async () => {
 }
 
 .chart-card {
-  border-radius: 8px;
-  border: 1px solid var(--paper-border);
-  box-shadow: var(--paper-shadow);
+  border: 1px solid var(--detail-card-border);
+  background: var(--detail-chart-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
 }
 
 .chart-card :deep(.el-card__header) {
@@ -1052,10 +1075,10 @@ onMounted(async () => {
 }
 
 .recommend-section {
-  border: 1px solid var(--paper-border);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--paper-shadow);
+  border: 1px solid var(--detail-card-border);
+  border-radius: var(--radius-card);
+  background: var(--detail-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
   overflow: hidden;
 }
 
@@ -1103,17 +1126,28 @@ onMounted(async () => {
   min-height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e8edf4;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.06);
+  border: 1px solid var(--detail-card-border);
+  border-radius: var(--radius-card);
+  background: var(--detail-panel-bg);
+  box-shadow: none;
+}
+
+.recommend-card.clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.recommend-card.clickable:hover {
+  border-color: var(--accent-primary-soft);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .item-image {
   position: relative;
   aspect-ratio: 1.24 / 1;
   overflow: hidden;
-  background: #eef3f8;
+  background: var(--paper-bg-soft);
 }
 
 .item-image img {
@@ -1129,12 +1163,12 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 32px;
   font-weight: 950;
   background:
     linear-gradient(135deg, rgba(16, 27, 49, 0.08), rgba(22, 132, 95, 0.12)),
-    #f6f9fc;
+    var(--surface-sunken);
 }
 
 .featured-badge {
@@ -1143,9 +1177,9 @@ onMounted(async () => {
   top: 12px;
   height: 26px;
   padding: 0 12px;
-  border-radius: 999px;
-  background: #55c18c;
-  color: #ffffff;
+  border-radius: var(--radius-pill);
+  background: var(--text-success);
+  color: var(--surface-floating);
   font-size: 12px;
   font-weight: 950;
   line-height: 26px;
@@ -1160,7 +1194,7 @@ onMounted(async () => {
   min-height: 48px;
   display: -webkit-box;
   overflow: hidden;
-  color: #1d2738;
+  color: var(--text-strong);
   font-size: 15px;
   font-weight: 900;
   line-height: 1.55;
@@ -1176,13 +1210,13 @@ onMounted(async () => {
 }
 
 .price-line strong {
-  color: #d9445d;
+  color: var(--text-danger);
   font-size: 24px;
   font-weight: 950;
 }
 
 .price-line span {
-  color: #9aa7b8;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1190,9 +1224,6 @@ onMounted(async () => {
 .match-box {
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid rgba(85, 193, 140, 0.2);
-  border-radius: 8px;
-  background: rgba(85, 193, 140, 0.1);
 }
 
 .match-box.caution {
@@ -1205,13 +1236,13 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #229765;
+  color: var(--badge-success-text);
   font-size: 12px;
   font-weight: 950;
 }
 
 .match-box.caution .match-title {
-  color: #d9445d;
+  color: var(--badge-danger-text);
 }
 
 .match-title strong {
@@ -1222,19 +1253,19 @@ onMounted(async () => {
   height: 6px;
   margin-top: 8px;
   overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
 }
 
 .match-track i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #55c18c;
+  background: var(--text-success);
 }
 
 .match-box.caution .match-track i {
-  background: #d9445d;
+  background: var(--text-danger);
 }
 
 .match-box p {
@@ -1242,7 +1273,7 @@ onMounted(async () => {
   margin-top: 9px;
   display: -webkit-box;
   overflow: hidden;
-  color: #526174;
+  color: var(--paper-muted);
   font-size: 12px;
   font-weight: 750;
   line-height: 1.65;
@@ -1260,14 +1291,11 @@ onMounted(async () => {
 .price-meta div {
   min-width: 0;
   padding: 10px;
-  border: 1px solid #eef2f7;
-  border-radius: 8px;
-  background: #fbfcfe;
 }
 
 .price-meta span {
   display: block;
-  color: #9aa7b8;
+  color: var(--paper-subtle);
   font-size: 11px;
   font-weight: 800;
 }
@@ -1276,7 +1304,7 @@ onMounted(async () => {
   display: block;
   margin-top: 5px;
   overflow: hidden;
-  color: #26364d;
+  color: var(--text-strong);
   font-size: 13px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -1289,8 +1317,8 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 10px;
   padding: 10px 14px;
-  border-top: 1px solid #eef2f7;
-  color: #9aa7b8;
+  border-top: 1px solid var(--paper-border);
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 850;
 }
@@ -1303,7 +1331,7 @@ onMounted(async () => {
 }
 
 .recommend-footer :deep(.el-button) {
-  color: #101b31;
+  color: var(--text-strong);
   font-weight: 950;
 }
 

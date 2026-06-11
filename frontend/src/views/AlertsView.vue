@@ -1,38 +1,20 @@
 <template>
-  <div class="ops-page">
-    <aside class="ops-sidebar">
-      <RouterLink class="brand" :to="{ name: 'home' }">
-        <span class="brand-mark"><el-icon><Lightning /></el-icon></span>
-        <div>
-          <strong>Market Pulse</strong>
-          <span>Second-hand Market</span>
-        </div>
-      </RouterLink>
-      <nav class="ops-nav">
-        <RouterLink :to="{ name: 'home' }"><el-icon><Grid /></el-icon><span>监控概览</span></RouterLink>
-        <RouterLink :to="{ name: 'deals' }"><el-icon><Aim /></el-icon><span>今日捡漏</span></RouterLink>
-        <RouterLink :to="{ name: 'hardware-admin' }"><el-icon><Setting /></el-icon><span>订阅管理</span></RouterLink>
-        <RouterLink class="active" :to="{ name: 'alerts' }"><el-icon><Bell /></el-icon><span>价格提醒</span></RouterLink>
-        <RouterLink :to="{ name: 'crawler-health' }"><el-icon><Monitor /></el-icon><span>爬虫健康</span></RouterLink>
-      </nav>
-
-      <div class="system-card">
-        <span class="system-label">系统状态</span>
-        <strong><i></i>后端实时已连接</strong>
-        <span>{{ crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新' }}</span>
-      </div>
-    </aside>
-
-    <main class="ops-main">
+  <OpsLayout
+    active-nav="alerts"
+    system-primary="后端实时已连接"
+    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
+  >
+    <template #header>
       <header class="ops-header">
-        <div>
-          <p>PRICE ALERTS</p>
-          <h1>价格提醒</h1>
+        <div class="ops-header-copy">
+          <h1 class="ops-header-title"><el-icon><Bell /></el-icon>价格提醒</h1>
+          <p class="ops-header-subtitle">统一管理价格阈值、通知通道和最近触发状态。</p>
         </div>
         <div class="target-box">
           <el-button type="primary" :icon="Plus" @click="creatingVisible = true">创建新提醒</el-button>
         </div>
       </header>
+    </template>
 
       <el-dialog v-model="creatingVisible" title="创建新提醒" width="620px">
         <el-form :model="draft" label-position="top" class="alert-grid">
@@ -66,15 +48,11 @@
 
       <section class="alert-list">
         <div class="panel-head">
-          <div>
-            <h2>提醒列表</h2>
-            <span>{{ alerts.length }} 条订阅 · {{ activeCount }} 条启用</span>
-          </div>
+          <span>{{ alerts.length }} 条订阅 · {{ activeCount }} 条启用</span>
         </div>
 
         <div class="alert-table">
           <div class="alert-head">
-            <span>状态</span>
             <span>提醒对象</span>
             <span>规则</span>
             <span>通道</span>
@@ -83,14 +61,6 @@
           </div>
 
           <article v-for="alert in sortedAlerts" :key="alert.id" class="alert-row" :class="{ idle: !alert.is_active }">
-            <div class="status-cell">
-              <el-switch
-                :model-value="alert.is_active"
-                @change="(value: string | number | boolean) => setAlertActive(alert, Boolean(value))"
-              />
-              <strong :class="{ active: alert.is_active }">{{ alert.is_active ? 'ACTIVE' : 'IDLE' }}</strong>
-            </div>
-
             <div class="alert-object">
               <h3>{{ scopeText(alert) }}</h3>
               <el-tag :type="alert.is_active ? 'success' : 'info'" effect="light" round>
@@ -114,23 +84,10 @@
             </div>
 
             <div class="action-cell">
-              <el-button
-                v-if="alert.is_active"
-                class="run-toggle danger"
-                :icon="Close"
-                @click="setAlertActive(alert, false)"
-              >
-                停止
-              </el-button>
-              <el-button
-                v-else
-                class="run-toggle"
-                type="primary"
-                :icon="VideoPlay"
-                @click="setAlertActive(alert, true)"
-              >
-                启动
-              </el-button>
+              <el-switch
+                :model-value="alert.is_active"
+                @change="(value: string | number | boolean) => setAlertActive(alert, Boolean(value))"
+              />
               <el-button class="icon-action" :icon="Edit" text title="编辑" @click="editAlert(alert)" />
               <el-button class="icon-action" :icon="Delete" text title="删除" @click="deleteAlert(alert)" />
             </div>
@@ -139,17 +96,17 @@
           <el-empty v-if="!alerts.length" description="暂无提醒" />
         </div>
       </section>
-    </main>
-  </div>
+  </OpsLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Close, Delete, Edit, Plus, VideoPlay } from '@element-plus/icons-vue'
+import { Bell, Delete, Edit, Plus } from '@element-plus/icons-vue'
 import { alertsApi, crawlerApi, hardwareApi } from '@/api'
 import type { AlertPayload, CrawlerStatus, HardwareDetail, PriceAlert } from '@/api/types'
+import OpsLayout from '@/components/OpsLayout.vue'
 
 const TARGET_KEY = 'hardware-alert-target'
 const route = useRoute()
@@ -324,8 +281,6 @@ function formatDateTime(value: string): string {
 </script>
 
 <style scoped>
-@import './ops-shared.css';
-
 .target-box {
   display: flex;
   justify-content: flex-end;
@@ -333,8 +288,8 @@ function formatDateTime(value: string): string {
 
 .alert-list {
   border: 1px solid var(--paper-border);
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: var(--radius-card);
+  background: var(--surface-floating);
   box-shadow: var(--paper-shadow);
 }
 
@@ -374,27 +329,20 @@ function formatDateTime(value: string): string {
   margin-bottom: 0;
 }
 
-.panel-head h2 {
-  font-size: 18px;
-  font-weight: 900;
-  color: #101b31;
-}
-
 .panel-head span {
   display: block;
-  margin-top: 3px;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
 }
 
 .alert-table {
-  border-top: 1px solid #e8edf4;
+  border-top: 1px solid var(--paper-border);
 }
 
 .alert-head,
 .alert-row {
   display: grid;
-  grid-template-columns: 96px minmax(210px, 1.1fr) minmax(190px, 1fr) minmax(190px, 0.9fr) minmax(160px, 0.8fr) minmax(190px, auto);
+  grid-template-columns: minmax(210px, 1.15fr) minmax(190px, 1fr) minmax(190px, 0.9fr) minmax(160px, 0.8fr) minmax(190px, auto);
   gap: 18px;
   align-items: center;
 }
@@ -402,8 +350,8 @@ function formatDateTime(value: string): string {
 .alert-head {
   height: 42px;
   padding: 0 20px;
-  background: #f8fafc;
-  color: #7a8799;
+  background: var(--paper-surface-soft);
+  color: var(--paper-muted);
   font-size: 12px;
   font-weight: 900;
 }
@@ -411,45 +359,16 @@ function formatDateTime(value: string): string {
 .alert-row {
   min-height: 104px;
   padding: 18px 20px;
-  border-top: 1px solid #edf1f6;
-  background: #ffffff;
+  border-top: 1px solid var(--paper-border);
+  background: var(--surface-floating);
 }
 
 .alert-row:hover {
-  background: #fbfcff;
+  background: var(--surface-soft-hover);
 }
 
 .alert-row.idle {
-  color: #8a97aa;
-}
-
-.status-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  align-items: flex-start;
-}
-
-.status-cell strong {
-  color: #a3afbf;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.status-cell strong::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  vertical-align: 1px;
-}
-
-.status-cell strong.active {
-  color: #16a56f;
+  color: var(--paper-subtle);
 }
 
 .alert-object {
@@ -462,7 +381,7 @@ function formatDateTime(value: string): string {
 .alert-object h3 {
   min-width: 0;
   overflow: hidden;
-  color: #101b31;
+  color: var(--text-strong);
   font-size: 17px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -480,7 +399,7 @@ function formatDateTime(value: string): string {
 .time-cell strong {
   display: block;
   overflow: hidden;
-  color: #26364d;
+  color: var(--text-strong);
   font-size: 15px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -493,7 +412,7 @@ function formatDateTime(value: string): string {
   display: block;
   margin-top: 6px;
   overflow: hidden;
-  color: #8a97aa;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -505,6 +424,7 @@ function formatDateTime(value: string): string {
   justify-content: flex-end;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .action-cell :deep(.el-button) {
@@ -516,15 +436,15 @@ function formatDateTime(value: string): string {
   width: 86px;
   height: 36px;
   border: 0;
-  border-radius: 8px;
-  background: #eef3f8;
-  color: #8a97aa;
+  border-radius: var(--radius-control);
+  background: var(--paper-surface-soft);
+  color: var(--paper-subtle);
 }
 
 .run-toggle.danger {
   background: #ef4444;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.2);
+  box-shadow: var(--shadow-control);
 }
 
 .run-toggle.danger:hover,
@@ -537,13 +457,13 @@ function formatDateTime(value: string): string {
   width: 32px;
   height: 32px;
   padding: 0;
-  color: #93a2b7;
+  color: var(--paper-subtle);
 }
 
 .icon-action:hover,
 .icon-action:focus {
-  color: #101b31;
-  background: #f3f6fa;
+  color: var(--text-strong);
+  background: var(--paper-surface-soft);
 }
 
 @media (max-width: 1100px) {

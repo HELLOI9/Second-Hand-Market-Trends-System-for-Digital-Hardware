@@ -8,7 +8,7 @@
       <path
         v-if="avgPath"
         :d="avgPath"
-        stroke="#2e7f8e"
+        stroke="var(--chart-spark-avg)"
         fill="none"
         stroke-width="1.35"
         stroke-linecap="round"
@@ -17,7 +17,7 @@
       <path
         v-if="medianPath"
         :d="medianPath"
-        stroke="#c86f3e"
+        stroke="var(--chart-spark-median)"
         fill="none"
         stroke-width="1.35"
         stroke-linecap="round"
@@ -127,13 +127,13 @@ const sparklineStyle = computed(() => ({
 }
 
 .baseline {
-  stroke: rgba(127, 138, 153, 0.28);
+  stroke: var(--line-soft);
   stroke-width: 0.8;
   stroke-dasharray: 2 2.5;
 }
 
 .placeholder {
-  color: #7f8a99;
+  color: var(--paper-subtle);
   font-size: 12px;
 }
 </style>

@@ -1,38 +1,20 @@
 <template>
-  <div class="ops-page">
-    <aside class="ops-sidebar">
-      <RouterLink class="brand" :to="{ name: 'home' }">
-        <span class="brand-mark"><el-icon><Lightning /></el-icon></span>
-        <div>
-          <strong>Market Pulse</strong>
-          <span>Second-hand Market</span>
-        </div>
-      </RouterLink>
-      <nav class="ops-nav">
-        <RouterLink :to="{ name: 'home' }"><el-icon><Grid /></el-icon><span>监控概览</span></RouterLink>
-        <RouterLink :to="{ name: 'deals' }"><el-icon><Aim /></el-icon><span>今日捡漏</span></RouterLink>
-        <RouterLink class="active" :to="{ name: 'hardware-admin' }"><el-icon><Setting /></el-icon><span>订阅管理</span></RouterLink>
-        <RouterLink :to="{ name: 'alerts' }"><el-icon><Bell /></el-icon><span>价格提醒</span></RouterLink>
-        <RouterLink :to="{ name: 'crawler-health' }"><el-icon><Monitor /></el-icon><span>爬虫健康</span></RouterLink>
-      </nav>
-
-      <div class="system-card">
-        <span class="system-label">系统状态</span>
-        <strong><i></i>后端实时已连接</strong>
-        <span>{{ crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新' }}</span>
-      </div>
-    </aside>
-
-    <main class="ops-main">
+  <OpsLayout
+    active-nav="hardware-admin"
+    system-primary="后端实时已连接"
+    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
+  >
+    <template #header>
       <header class="ops-header">
-        <div>
-          <p>ADMIN CONSOLE</p>
-          <h1>订阅管理</h1>
+        <div class="ops-header-copy">
+          <h1 class="ops-header-title"><el-icon><Setting /></el-icon>订阅管理</h1>
+          <p class="ops-header-subtitle">维护监测对象、搜索关键词和启停状态，保证采集池始终干净可控。</p>
         </div>
         <div class="header-actions">
           <el-button type="primary" :icon="Plus" @click="creatingVisible = true">创建新订阅</el-button>
         </div>
       </header>
+    </template>
 
       <el-dialog v-model="creatingVisible" title="新建订阅" width="620px">
         <el-form :model="draft" label-position="top" class="compose-grid">
@@ -50,16 +32,12 @@
 
       <section class="table-panel">
         <div class="panel-head">
-          <div>
-            <h2>订阅对象</h2>
-            <span>{{ items.length }} 个条目 · {{ activeCount }} 个启用</span>
-          </div>
+          <span>{{ items.length }} 个条目 · {{ activeCount }} 个启用</span>
           <el-input v-model="query" class="search-input" clearable placeholder="搜索名称或关键词" />
         </div>
 
         <div class="subscription-list">
           <div class="subscription-head">
-            <span>状态</span>
             <span>订阅详情</span>
             <span>关键词</span>
             <span>最新统计</span>
@@ -67,15 +45,6 @@
           </div>
 
           <article v-for="item in filteredItems" :key="item.id" class="subscription-row" :class="{ idle: !item.is_active }">
-            <div class="status-cell">
-              <el-switch
-                :model-value="item.is_active"
-                :loading="saving"
-                @change="(value: string | number | boolean) => toggleItem(item, Boolean(value))"
-              />
-              <strong :class="{ active: item.is_active }">{{ item.is_active ? 'ACTIVE' : 'IDLE' }}</strong>
-            </div>
-
             <div class="detail-cell">
               <div class="item-title">
                 <h3>{{ item.name }}</h3>
@@ -103,23 +72,11 @@
             </div>
 
             <div class="action-cell">
-              <el-button
-                v-if="item.is_active"
-                class="run-toggle danger"
-                :icon="Close"
-                @click="disableItem(item)"
-              >
-                停止
-              </el-button>
-              <el-button
-                v-else
-                class="run-toggle"
-                type="primary"
-                :icon="VideoPlay"
-                @click="restoreItem(item)"
-              >
-                启动
-              </el-button>
+              <el-switch
+                :model-value="item.is_active"
+                :loading="saving"
+                @change="(value: string | number | boolean) => toggleItem(item, Boolean(value))"
+              />
               <el-button class="icon-action" :icon="Edit" text title="编辑" @click="openEdit(item)" />
               <el-button class="icon-action" :icon="Delete" text title="删除" @click="disableItem(item)" />
             </div>
@@ -146,17 +103,16 @@
           <el-button type="primary" :loading="saving" @click="saveEdit">保存</el-button>
         </template>
       </el-dialog>
-    </main>
-  </div>
+  </OpsLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Close, Delete, Edit, Plus, VideoPlay } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Setting } from '@element-plus/icons-vue'
 import { crawlerApi, hardwareApi } from '@/api'
 import type { CrawlerStatus, HardwareDetail } from '@/api/types'
+import OpsLayout from '@/components/OpsLayout.vue'
 
 const ADMIN_TOKEN = 'dev-admin-token'
 const DEFAULT_CATEGORY = 'general'
@@ -307,18 +263,9 @@ function formatPrice(price: number): string {
 </script>
 
 <style scoped>
-@import './ops-shared.css';
-
 .header-actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.table-panel {
-  border: 1px solid var(--paper-border);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--paper-shadow);
 }
 
 .compose-grid {
@@ -341,7 +288,7 @@ function formatPrice(price: number): string {
 .create-btn {
   height: 40px;
   padding: 0 18px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-weight: 900;
 }
 
@@ -359,16 +306,9 @@ function formatPrice(price: number): string {
   margin-bottom: 0;
 }
 
-.panel-head h2 {
-  color: #101b31;
-  font-size: 18px;
-  font-weight: 900;
-}
-
 .panel-head span {
   display: block;
-  margin-top: 3px;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
 }
 
@@ -383,13 +323,13 @@ function formatPrice(price: number): string {
 }
 
 .subscription-list {
-  border-top: 1px solid #e8edf4;
+  border-top: 1px solid var(--paper-border);
 }
 
 .subscription-head,
 .subscription-row {
   display: grid;
-  grid-template-columns: 96px minmax(220px, 1.2fr) minmax(220px, 1fr) minmax(170px, 0.8fr) minmax(190px, auto);
+  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) minmax(170px, 0.8fr) minmax(190px, auto);
   gap: 18px;
   align-items: center;
 }
@@ -397,8 +337,8 @@ function formatPrice(price: number): string {
 .subscription-head {
   height: 42px;
   padding: 0 20px;
-  background: #f8fafc;
-  color: #7a8799;
+  background: var(--paper-surface-soft);
+  color: var(--paper-muted);
   font-size: 12px;
   font-weight: 900;
 }
@@ -406,45 +346,16 @@ function formatPrice(price: number): string {
 .subscription-row {
   min-height: 104px;
   padding: 18px 20px;
-  border-top: 1px solid #edf1f6;
-  background: #ffffff;
+  border-top: 1px solid var(--paper-border);
+  background: var(--surface-floating);
 }
 
 .subscription-row:hover {
-  background: #fbfcff;
+  background: var(--surface-soft-hover);
 }
 
 .subscription-row.idle {
-  color: #8a97aa;
-}
-
-.status-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  align-items: flex-start;
-}
-
-.status-cell strong {
-  color: #a3afbf;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.status-cell strong::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  vertical-align: 1px;
-}
-
-.status-cell strong.active {
-  color: #16a56f;
+  color: var(--paper-subtle);
 }
 
 .detail-cell {
@@ -461,7 +372,7 @@ function formatPrice(price: number): string {
 .item-title h3 {
   min-width: 0;
   overflow: hidden;
-  color: #101b31;
+  color: var(--text-strong);
   font-size: 17px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -471,7 +382,7 @@ function formatPrice(price: number): string {
 .item-subline {
   display: block;
   margin-top: 8px;
-  color: #8a97aa;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 800;
 }
@@ -485,9 +396,9 @@ function formatPrice(price: number): string {
 
 .keyword-cell :deep(.el-tag) {
   max-width: 100%;
-  border-color: #dfe7f1;
-  background: #f8fbff;
-  color: #526174;
+  border-color: var(--paper-border);
+  background: var(--paper-surface-soft);
+  color: var(--paper-muted);
   font-weight: 800;
 }
 
@@ -497,7 +408,7 @@ function formatPrice(price: number): string {
 
 .stats-cell strong {
   display: block;
-  color: #26364d;
+  color: var(--text-strong);
   font-size: 16px;
   font-weight: 950;
 }
@@ -506,7 +417,7 @@ function formatPrice(price: number): string {
   display: block;
   margin-top: 6px;
   overflow: hidden;
-  color: #8a97aa;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -518,6 +429,7 @@ function formatPrice(price: number): string {
   justify-content: flex-end;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .action-cell :deep(.el-button) {
@@ -529,15 +441,15 @@ function formatPrice(price: number): string {
   width: 86px;
   height: 36px;
   border: 0;
-  border-radius: 8px;
-  background: #eef3f8;
-  color: #8a97aa;
+  border-radius: var(--radius-control);
+  background: var(--paper-surface-soft);
+  color: var(--paper-subtle);
 }
 
 .run-toggle.danger {
   background: #ef4444;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.2);
+  box-shadow: var(--shadow-control);
 }
 
 .run-toggle.danger:hover,
@@ -550,13 +462,13 @@ function formatPrice(price: number): string {
   width: 32px;
   height: 32px;
   padding: 0;
-  color: #93a2b7;
+  color: var(--paper-subtle);
 }
 
 .icon-action:hover,
 .icon-action:focus {
-  color: #101b31;
-  background: #f3f6fa;
+  color: var(--text-strong);
+  background: var(--paper-surface-soft);
 }
 
 @media (max-width: 900px) {

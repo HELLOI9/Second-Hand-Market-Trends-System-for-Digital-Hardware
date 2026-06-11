@@ -1,7 +1,6 @@
 <template>
   <el-card class="hardware-card" :class="levelClass" shadow="never" @click="emit('click')">
     <div class="card-header">
-      <span class="object-pill">监测对象</span>
       <span class="level-pill" v-if="latestStats">{{ levelLabel }}</span>
     </div>
 
@@ -68,17 +67,17 @@ function formatPrice(price: number): string {
 <style scoped>
 .hardware-card {
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   border: 1px solid var(--paper-border);
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.06);
+  background: var(--surface-floating);
+  box-shadow: var(--paper-shadow);
   transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .hardware-card:hover {
   border-color: var(--paper-border-strong);
-  background: #fbfdff;
-  box-shadow: 0 18px 34px rgba(16, 27, 49, 0.09);
+  background: var(--surface-soft-hover);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .hardware-card :deep(.el-card__body) {
@@ -99,19 +98,19 @@ function formatPrice(price: number): string {
   justify-content: center;
   height: 24px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 12px;
   font-weight: 700;
 }
 
 .object-pill {
-  color: #101b31;
+  color: var(--text-strong);
   background: var(--v-soft-1);
 }
 
 .level-pill {
-  color: #047857;
-  background: #dff8ee;
+  color: var(--chip-normal-text);
+  background: var(--chip-normal-bg);
 }
 
 .name {
@@ -133,7 +132,7 @@ function formatPrice(price: number): string {
   font-size: 28px;
   line-height: 1;
   font-weight: 700;
-  color: #101b31;
+  color: var(--text-strong);
 }
 
 .price-label {
@@ -162,21 +161,30 @@ function formatPrice(price: number): string {
 }
 
 .level-low .level-pill {
-  color: var(--v4);
-  background: var(--v-soft-3);
+  color: var(--chip-normal-text);
+  background: var(--chip-normal-bg);
 }
 
 .level-low .price {
-  color: var(--v4);
+  color: rgb(var(--heat-low-rgb));
+}
+
+.level-normal .level-pill {
+  color: var(--chip-high-text);
+  background: var(--chip-high-bg);
+}
+
+.level-normal .price {
+  color: rgb(var(--heat-normal-rgb));
 }
 
 .level-high .level-pill {
-  color: var(--v1);
-  background: var(--v-soft-1);
+  color: var(--chip-high-text);
+  background: var(--chip-high-bg);
 }
 
 .level-high .price {
-  color: var(--v1);
+  color: rgb(var(--heat-high-rgb));
 }
 
 @media (max-width: 900px) {

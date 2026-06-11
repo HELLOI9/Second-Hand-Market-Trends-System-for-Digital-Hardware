@@ -1,0 +1,143 @@
+/* ==========================================================================
+   Light Theme Refined - "Virtus" Dashboard Style (Flat & Soft)
+   ========================================================================== */
+
+:root,
+:root[data-theme='light'] {
+  /* 1. 核心背景色 - 彻底去除蓝相，采用极其柔和的中性浅灰 (Off-white) */
+  --paper-bg: #f2f3f5;           /* 最底层背景，参考图中的灰色底 */
+  --paper-bg-soft: #ebecee;      /* 稍深的灰色，用于侧边栏或悬浮底 */
+  --paper-surface: #ffffff;      /* 卡片纯白，与背景形成干净的对比 */
+  --paper-surface-soft: #f8f9fa; /* 卡片内部的次级容器（如参考图的聊天气泡、进度背景） */
+
+  --surface-sunken: #f0f1f3;     /* 凹陷的输入框/搜索框底色 */
+  --surface-floating: #ffffff;
+  --surface-soft-hover: #f3f4f6;
+  --surface-glass: rgba(255, 255, 255, 0.85);
+
+  /* 2. 边框 - 极度微弱，或者直接隐藏，靠颜色区分 */
+  --paper-border: rgba(0, 0, 0, 0.04);
+  --paper-border-strong: rgba(0, 0, 0, 0.08);
+  --line-soft: rgba(0, 0, 0, 0.03);
+  --line-strong: rgba(0, 0, 0, 0.06);
+
+  /* 3. 字体颜色 - 纯正的黑灰体系，剔除原本的深蓝色 */
+  --text-strong: #111827;        /* 极黑标题 (如参考图的 Let's start strong!) */
+  --paper-text: #374151;         /* 正文深灰 */
+  --paper-muted: #6b7280;        /* 辅助说明文字、单位 */
+  --paper-subtle: #9ca3af;       /* 占位符 */
+
+  /* 4. 品牌主色 - 赤土橙 (Terracotta Orange) 保持与暗色模式一致 */
+  --accent-primary: #dd6647;
+  --accent-primary-strong: #c95b3f;
+  --accent-primary-soft: rgba(221, 102, 71, 0.1);
+
+  --text-danger: #ef4444;
+  --text-success: #10b981;
+  --text-warning: #dd6647;       /* 统一收束为品牌橙色 */
+
+  /* 5. 阴影系统 - 彻底扁平化，摒弃你原有的 0 10px 20px 这种大投影 */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.02); /* 只有极弱的弥散光防黏连 */
+  --paper-shadow: var(--shadow-card);
+  --shadow-floating: 0 10px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--paper-border);
+  --detail-panel-shadow: 0 20px 38px rgba(120, 68, 36, 0.08);
+
+  /* 6. 导航布局背景 - 回归纯净 */
+  --layout-page-gradient: var(--paper-bg);
+  --layout-sidebar-bg: var(--paper-surface); /* 侧边栏纯白 */
+  --layout-topbar-bg: var(--paper-surface);
+  --layout-sidebar-border-right: 1px solid var(--paper-border);
+  --layout-sidebar-border-bottom-mobile: 1px solid var(--paper-border);
+  --layout-topbar-border-bottom: 1px solid var(--paper-border);
+
+  /* 导航选中状态：参考图中深灰侧边栏的白字，我们在浅色版采用橘色激活 */
+  --layout-nav-hover-bg: #f3f4f6;
+  --layout-nav-hover-text: var(--text-strong);
+  --layout-nav-active-bg: rgba(221, 102, 71, 0.5);
+  --layout-nav-active-text: var(--text-strong);
+  --layout-nav-active-bar: transparent; /* 去除左侧竖条 */
+  --nav-item-radius: 999px;
+  --nav-item-margin: 4px 12px;
+  --nav-item-padding: 10px 16px;
+  --nav-item-color: var(--paper-muted);
+  --nav-item-active-weight: 500;
+
+  --surface-panel-bg: var(--paper-surface);
+  --surface-panel-border: 1px solid var(--paper-border);
+  --surface-panel-shadow: var(--shadow-card);
+  --surface-panel-radius: 20px;
+  --surface-panel-padding: 20px;
+  --surface-panel-inner-bg: var(--paper-surface-soft);
+  --surface-panel-inner-border: none;
+  --surface-panel-inner-radius: 14px;
+
+  --control-input-bg: var(--surface-sunken);
+  --control-input-border: 1px solid transparent;
+  --control-input-focus-border: var(--accent-primary);
+  --control-input-focus-bg: var(--paper-surface);
+  --control-input-shadow: none;
+  --control-input-focus-shadow: none;
+  --control-primary-shadow: none;
+  --control-primary-hover-shadow: none;
+
+  --type-emphasis-weight: 600;
+  --type-emphasis-letter-spacing: -0.5px;
+  --type-muted-color: var(--paper-muted);
+
+  --table-surface-bg: transparent;
+  --table-head-bg: transparent;
+  --table-head-color: var(--paper-muted);
+  --table-head-border: 1px solid var(--paper-border-strong);
+  --table-cell-border: 1px solid var(--line-soft);
+
+  --tag-pill-border: none;
+  --tag-pill-radius: 999px;
+  --tag-pill-weight: 500;
+
+  --dashboard-metric-card-blue: rgba(235, 122, 83, 0.6);
+  --dashboard-metric-card-green: rgba(247, 212, 76, 0.6);
+  --dashboard-metric-card-amber: rgba(235, 122, 83, 0.6);
+  --dashboard-metric-card-purple: rgba(247, 212, 76, 0.6);
+  --dashboard-metric-text: #593324;
+  --dashboard-metric-muted: rgba(89, 51, 36, 0.78);
+  --dashboard-metric-icon: rgba(89, 51, 36, 0.82);
+
+  --detail-hero-panel-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+  --detail-hero-text: var(--text-strong);
+  --detail-hero-muted: var(--paper-muted);
+  --detail-hero-button-border: rgba(221, 102, 71, 0.24);
+  --detail-hero-button-bg: rgba(221, 102, 71, 0.08);
+  --detail-hero-button-bg-hover: rgba(221, 102, 71, 0.16);
+  --detail-panel-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(252, 247, 242, 0.96) 100%);
+  --detail-chart-panel-bg:
+    linear-gradient(180deg, rgba(255, 250, 246, 0.98) 0%, rgba(247, 212, 76, 0.1) 100%);
+  --detail-card-border: rgba(221, 102, 71, 0.12);
+  --detail-row-border: rgba(221, 102, 71, 0.16);
+
+  --chart-series-median: #dd6647;
+  --chart-series-avg: #b78b16;
+  --chart-series-min: #2c8c67;
+  --chart-series-max: #8e63ce;
+  --chart-spark-avg: #b78b16;
+  --chart-spark-median: #dd6647;
+
+  --heat-low-rgb: 59, 130, 246;
+  --heat-normal-rgb: 229, 179, 25;
+  --heat-high-rgb: 221, 102, 71;
+  --heat-cell-text: #102033;
+
+  /* 7. Element Plus 等 UI 框架注入 */
+  --el-color-primary: var(--accent-primary);
+  --el-bg-color: #ffffff;
+  --el-border-color: var(--paper-border-strong);
+}
+
+/* 状态标签配色优化（更清透） */
+:root[data-theme='light'] .chip-low,
+:root:not([data-theme='dark']) .chip-low { color: #059669; background: #d1fae5; }
+:root[data-theme='light'] .chip-normal,
+:root:not([data-theme='dark']) .chip-normal { color: #2563eb; background: #dbeafe; }
+:root[data-theme='light'] .chip-high,
+:root:not([data-theme='dark']) .chip-high { color: #d97706; background: #fef3c7; }

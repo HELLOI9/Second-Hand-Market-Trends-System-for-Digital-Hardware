@@ -9,9 +9,14 @@ backend/cookies.json
 cookies.json
 .claude/
 .vscode/
+.idea/
 .codex/
 
 # vue-tsc 误生成的产物
 frontend/src/**/*.js
 frontend/src/**/*.vue.js
 *.tsbuildinfo
+
+# Vite / frontend 本地环境文件
+frontend/.env.local
+frontend/.env.*.local
