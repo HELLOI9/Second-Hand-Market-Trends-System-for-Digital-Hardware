@@ -1,37 +1,21 @@
 <template>
-  <div class="ops-page">
-    <aside class="ops-sidebar">
-      <RouterLink class="brand" :to="{ name: 'home' }">
-        <span class="brand-mark"><el-icon><Lightning /></el-icon></span>
-        <div>
-          <strong>Market Pulse</strong>
-          <span>Second-hand Market</span>
-        </div>
-      </RouterLink>
-      <nav class="ops-nav">
-        <RouterLink :to="{ name: 'home' }"><el-icon><Grid /></el-icon><span>监控概览</span></RouterLink>
-        <RouterLink :to="{ name: 'deals' }"><el-icon><Aim /></el-icon><span>今日捡漏</span></RouterLink>
-        <RouterLink :to="{ name: 'hardware-admin' }"><el-icon><Setting /></el-icon><span>订阅管理</span></RouterLink>
-        <RouterLink :to="{ name: 'alerts' }"><el-icon><Bell /></el-icon><span>价格提醒</span></RouterLink>
-        <RouterLink class="active" :to="{ name: 'crawler-health' }"><el-icon><Monitor /></el-icon><span>爬虫健康</span></RouterLink>
-      </nav>
-
-      <div class="system-card">
-        <span class="system-label">系统状态</span>
-        <strong><i></i>后端实时已连接</strong>
-        <span>{{ health?.latest_run?.started_at ? `更新于 ${formatDate(health.latest_run.started_at)}` : '等待首次更新' }}</span>
-      </div>
-    </aside>
-
-    <main class="ops-main">
+  <OpsLayout
+    active-nav="crawler-health"
+    system-primary="后端实时已连接"
+    :system-secondary="health?.latest_run?.started_at ? `更新于 ${formatDate(health.latest_run.started_at)}` : '等待首次更新'"
+  >
+    <template #header>
       <header class="ops-header">
-        <div>
-          <p>CRAWLER HEALTH</p>
-          <h1>爬虫健康监控</h1>
-          <span v-if="lastRefreshedAt" class="refresh-stamp">页面刷新于 {{ lastRefreshedAt }}</span>
+        <div class="ops-header-copy">
+          <h1 class="ops-header-title"><el-icon><Monitor /></el-icon>采集健康</h1>
+          <p class="ops-header-subtitle">
+            样本断档、采集轮次和 Cookie 可用性都会在这里统一展示。
+            <template v-if="lastRefreshedAt">页面刷新于 {{ lastRefreshedAt }}</template>
+          </p>
         </div>
         <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadHealth(false, true)">刷新状态</el-button>
       </header>
+    </template>
 
       <template v-if="health">
         <section class="health-grid">
@@ -64,7 +48,7 @@
               <span>{{ health.latest_run?.started_at ? formatDateTime(health.latest_run.started_at) : '暂无' }}</span>
             </div>
             <el-tag v-if="health.latest_run" :type="runTagType" round>
-              {{ health.latest_run.status }}
+              {{ formatRunStatus(health.latest_run.status) }}
             </el-tag>
           </div>
 
@@ -95,17 +79,16 @@
           <el-empty v-else description="当前没有健康预警" />
         </section>
       </template>
-    </main>
-  </div>
+  </OpsLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Monitor, Refresh } from '@element-plus/icons-vue'
 import { healthApi } from '@/api'
 import type { CrawlerHealth } from '@/api/types'
+import OpsLayout from '@/components/OpsLayout.vue'
 
 const loading = ref(false)
 const health = ref<CrawlerHealth | null>(null)
@@ -158,6 +141,20 @@ function formatDate(value: string): string {
   return value.slice(0, 10)
 }
 
+function formatRunStatus(status: string): string {
+  const labels: Record<string, string> = {
+    success: '成功',
+    partial: '部分完成',
+    failed: '失败',
+    running: '运行中',
+    crawling: '采集中',
+    validating: '校验中',
+    aggregating: '聚合中',
+    paused: '已暂停',
+  }
+  return labels[status] ?? status
+}
+
 function formatDateTime(value: string): string {
   const normalized = value.includes('T') ? value : value.replace(' ', 'T')
   const date = new Date(normalized)
@@ -170,8 +167,6 @@ function formatDateTime(value: string): string {
 </script>
 
 <style scoped>
-@import './ops-shared.css';
-
 .health-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -182,8 +177,8 @@ function formatDateTime(value: string): string {
 .health-card,
 .run-panel {
   border: 1px solid var(--paper-border);
-  border-radius: 8px;
-  background: #ffffff;
+  border-radius: var(--radius-card);
+  background: var(--surface-floating);
   box-shadow: var(--paper-shadow);
 }
 
@@ -194,7 +189,7 @@ function formatDateTime(value: string): string {
 .health-card span,
 .health-card small {
   display: block;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -203,14 +198,15 @@ function formatDateTime(value: string): string {
   display: block;
   margin: 8px 0;
   font-size: 28px;
+  color: var(--text-strong);
 }
 
 .health-card.ok strong {
-  color: #16845f;
+  color: var(--text-success);
 }
 
 .health-card.warning strong {
-  color: #a06512;
+  color: var(--text-warning);
 }
 
 .run-panel {
@@ -233,14 +229,14 @@ function formatDateTime(value: string): string {
 .panel-head span {
   display: block;
   margin-top: 3px;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
 }
 
 .refresh-stamp {
   display: block;
   margin-top: 6px;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -253,10 +249,7 @@ function formatDateTime(value: string): string {
 }
 
 .run-summary div {
-  border: 1px solid #e6ebf2;
-  border-radius: 8px;
   padding: 12px;
-  background: #f8fafc;
 }
 
 .run-summary span,
@@ -265,7 +258,7 @@ function formatDateTime(value: string): string {
 }
 
 .run-summary span {
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
 }
 
@@ -289,20 +282,20 @@ function formatDateTime(value: string): string {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  border: 1px solid #e6ebf2;
-  border-radius: 8px;
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
   padding: 12px;
-  background: #f8fafc;
+  background: var(--paper-surface-soft);
 }
 
 .health-alert.error {
   border-color: rgba(124, 111, 156, 0.34);
-  background: rgba(124, 111, 156, 0.08);
+  background: rgba(124, 111, 156, 0.12);
 }
 
 .health-alert.warning {
   border-color: rgba(160, 101, 18, 0.25);
-  background: rgba(160, 101, 18, 0.08);
+  background: rgba(160, 101, 18, 0.12);
 }
 
 .health-alert strong,
@@ -312,7 +305,7 @@ function formatDateTime(value: string): string {
 
 .health-alert span {
   margin-top: 3px;
-  color: #64748b;
+  color: var(--paper-muted);
   font-size: 13px;
 }
 

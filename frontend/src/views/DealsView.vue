@@ -1,52 +1,35 @@
 <template>
-  <div class="ops-page">
-    <aside class="ops-sidebar">
-      <RouterLink class="brand" :to="{ name: 'home' }">
-        <span class="brand-mark"><el-icon><Lightning /></el-icon></span>
-        <div>
-          <strong>Market Pulse</strong>
-          <span>Second-hand Market</span>
-        </div>
-      </RouterLink>
-      <nav class="ops-nav">
-        <RouterLink :to="{ name: 'home' }"><el-icon><Grid /></el-icon><span>监控概览</span></RouterLink>
-        <RouterLink class="active" :to="{ name: 'deals' }"><el-icon><Aim /></el-icon><span>今日捡漏</span></RouterLink>
-        <RouterLink :to="{ name: 'hardware-admin' }"><el-icon><Setting /></el-icon><span>订阅管理</span></RouterLink>
-        <RouterLink :to="{ name: 'alerts' }"><el-icon><Bell /></el-icon><span>价格提醒</span></RouterLink>
-        <RouterLink :to="{ name: 'crawler-health' }"><el-icon><Monitor /></el-icon><span>爬虫健康</span></RouterLink>
-      </nav>
-
-      <div class="system-card">
-        <span class="system-label">系统状态</span>
-        <strong><i></i>后端实时已连接</strong>
-        <span>{{ crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新' }}</span>
-      </div>
-    </aside>
-
-    <main class="ops-main">
+  <OpsLayout
+    active-nav="deals"
+    system-primary="后端实时已连接"
+    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
+  >
+    <template #header>
       <header class="ops-header">
-        <div>
-          <p>TODAY DEALS</p>
-          <h1>今日捡漏</h1>
-          <span class="rule-text">样本价低于近 30 天基准中位价 15% 以上时进入候选。</span>
+        <div class="ops-header-copy">
+          <h1 class="ops-header-title"><el-icon><Aim /></el-icon>今日捡漏</h1>
+          <p class="ops-header-subtitle">样本价低于近 30 天基准中位价 15% 以上时进入候选。</p>
         </div>
         <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadDeals">刷新</el-button>
       </header>
+    </template>
 
       <section class="deals-panel">
         <div class="panel-head">
-          <div>
-            <h2>今日可捡漏商品</h2>
-            <span>{{ deals.length }} 个候选 · 按折扣率从高到低排序</span>
-          </div>
+          <span>{{ deals.length }} 个候选 · 按折扣率从高到低排序</span>
         </div>
 
         <div v-if="deals.length" class="deal-grid">
-          <article v-for="deal in deals" :key="`${deal.hardware_id}-${deal.item_url}-${deal.price}`" class="deal-card">
+          <article
+            v-for="deal in deals"
+            :key="`${deal.hardware_id}-${deal.item_url}-${deal.price}`"
+            class="deal-card"
+            :class="{ clickable: Boolean(deal.item_url) }"
+            @click="deal.item_url && openDeal(deal.item_url)"
+          >
             <div class="item-image">
-              <img v-if="deal.image_url" :src="deal.image_url" :alt="deal.title" loading="lazy" />
-              <div v-else class="image-placeholder">{{ deal.hardware_name.slice(0, 2) }}</div>
-              <span class="featured-badge">捡漏</span>
+            <img v-if="deal.image_url" :src="deal.image_url" :alt="deal.title" loading="lazy" />
+            <div v-else class="image-placeholder">{{ deal.hardware_name.slice(0, 2) }}</div>
             </div>
 
             <div class="deal-body">
@@ -72,24 +55,23 @@
 
             <footer class="deal-footer">
               <span>{{ deal.seller || '未知卖家' }}</span>
-              <el-button v-if="deal.item_url" text @click="openDeal(deal.item_url)">详情</el-button>
+              <el-button v-if="deal.item_url" text @click.stop="openDeal(deal.item_url)">详情</el-button>
               <span v-else>无链接</span>
             </footer>
           </article>
         </div>
         <el-empty v-if="!loading && !deals.length" description="今天暂无捡漏候选" />
       </section>
-    </main>
-  </div>
+  </OpsLayout>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Aim, Refresh } from '@element-plus/icons-vue'
 import { crawlerApi, dealsApi } from '@/api'
 import type { CrawlerStatus, DealItem } from '@/api/types'
+import OpsLayout from '@/components/OpsLayout.vue'
 
 const deals = ref<DealItem[]>([])
 const crawlerStatus = ref<CrawlerStatus | null>(null)
@@ -133,36 +115,17 @@ function openDeal(url: string) {
 </script>
 
 <style scoped>
-@import './ops-shared.css';
-
-.rule-text {
-  display: block;
-  margin-top: 6px;
-  color: #718198;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .deals-panel {
   padding: 20px;
-  border: 1px solid var(--paper-border);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: var(--paper-shadow);
 }
 
 .panel-head {
   margin-bottom: 14px;
 }
 
-.panel-head h2 {
-  font-size: 18px;
-}
-
 .panel-head span {
   display: block;
-  margin-top: 3px;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 12px;
 }
 
@@ -173,21 +136,52 @@ function openDeal(url: string) {
 }
 
 .deal-card {
+  position: relative;
   display: flex;
   min-height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e8edf4;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 12px 24px rgba(16, 27, 49, 0.06);
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
+  background: var(--surface-floating);
+  box-shadow: var(--paper-shadow);
+}
+
+.deal-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--surface-soft-hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.deal-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.deal-card.clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.deal-card.clickable:hover {
+  border-color: var(--paper-border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.deal-card.clickable:hover::after {
+  opacity: 1;
 }
 
 .item-image {
   position: relative;
   aspect-ratio: 1.24 / 1;
   overflow: hidden;
-  background: #eef3f8;
+  background: var(--paper-bg-soft);
 }
 
 .item-image img {
@@ -203,12 +197,12 @@ function openDeal(url: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7b8798;
+  color: var(--paper-muted);
   font-size: 32px;
   font-weight: 950;
   background:
     linear-gradient(135deg, rgba(16, 27, 49, 0.08), rgba(22, 132, 95, 0.12)),
-    #f6f9fc;
+    var(--surface-sunken);
 }
 
 .featured-badge {
@@ -217,9 +211,9 @@ function openDeal(url: string) {
   top: 12px;
   height: 26px;
   padding: 0 12px;
-  border-radius: 999px;
-  background: #55c18c;
-  color: #ffffff;
+  border-radius: var(--radius-pill);
+  background: var(--text-success);
+  color: var(--surface-floating);
   font-size: 12px;
   font-weight: 950;
   line-height: 26px;
@@ -233,7 +227,7 @@ function openDeal(url: string) {
 .hardware-name {
   display: block;
   margin-bottom: 6px;
-  color: #94a1b4;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 900;
 }
@@ -242,7 +236,7 @@ function openDeal(url: string) {
   min-height: 48px;
   display: -webkit-box;
   overflow: hidden;
-  color: #1d2738;
+  color: var(--text-strong);
   font-size: 15px;
   font-weight: 900;
   line-height: 1.55;
@@ -258,23 +252,23 @@ function openDeal(url: string) {
 }
 
 .price-line strong {
-  color: #d9445d;
+  color: var(--text-danger);
   font-size: 24px;
   font-weight: 950;
 }
 
 .price-line span {
-  color: #9aa7b8;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 800;
 }
 
 .price-line em {
   margin-left: auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 9px;
-  background: rgba(22, 132, 95, 0.12);
-  color: #16845f;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
   font-size: 12px;
   font-style: normal;
   font-weight: 950;
@@ -288,10 +282,7 @@ function openDeal(url: string) {
 }
 
 .price-meta div {
-  border: 1px solid #edf1f6;
-  border-radius: 8px;
   padding: 10px;
-  background: #fbfcff;
 }
 
 .price-meta span,
@@ -300,14 +291,14 @@ function openDeal(url: string) {
 }
 
 .price-meta span {
-  color: #9aa7b8;
+  color: var(--paper-subtle);
   font-size: 11px;
   font-weight: 900;
 }
 
 .price-meta strong {
   margin-top: 4px;
-  color: #1d2738;
+  color: var(--text-strong);
   font-size: 13px;
   font-weight: 950;
 }
@@ -318,14 +309,14 @@ function openDeal(url: string) {
   justify-content: space-between;
   gap: 12px;
   min-height: 48px;
-  border-top: 1px solid #edf1f6;
+  border-top: 1px solid var(--paper-border);
   padding: 0 14px;
 }
 
 .deal-footer span {
   min-width: 0;
   overflow: hidden;
-  color: #94a1b4;
+  color: var(--paper-subtle);
   font-size: 12px;
   font-weight: 900;
   text-overflow: ellipsis;
@@ -333,7 +324,7 @@ function openDeal(url: string) {
 }
 
 .deal-footer :deep(.el-button) {
-  color: #101b31;
+  color: var(--text-strong);
   font-weight: 950;
 }
 

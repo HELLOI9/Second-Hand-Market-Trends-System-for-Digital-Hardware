@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
@@ -23,15 +23,11 @@ import type { TrendPoint } from '@/api/types'
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent])
 
 const props = defineProps<{ trend: TrendPoint[] }>()
-
-const SERIES_COLORS = {
-  median: '#1d4e89',
-  avg: '#2f7ed8',
-  min: '#2f9e44',
-  max: '#7b5fc9',
-}
+type TooltipParam = { dataIndex?: number }
 
 const isSinglePoint = computed(() => props.trend.length === 1)
+const themeVersion = ref(0)
+let themeObserver: MutationObserver | null = null
 
 function formatPriceTick(val: number): string {
   return val >= 10000 ? `${(val / 10000).toFixed(1)}万` : Math.round(val).toLocaleString()
@@ -41,7 +37,45 @@ function toTimestamp(dateStr: string): number {
   return new Date(`${dateStr}T00:00:00`).getTime()
 }
 
+function readThemeVar(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+const themePalette = computed(() => {
+  themeVersion.value
+  return {
+    median: readThemeVar('--chart-series-median', '#1d4e89'),
+    avg: readThemeVar('--chart-series-avg', '#2f7ed8'),
+    min: readThemeVar('--chart-series-min', '#2f9e44'),
+    max: readThemeVar('--chart-series-max', '#7b5fc9'),
+    axis: readThemeVar('--chart-axis', '#536170'),
+    grid: readThemeVar('--chart-grid', 'rgba(127, 138, 153, 0.22)'),
+    crosshair: readThemeVar('--chart-crosshair', '#7f8a99'),
+    tooltipBg: readThemeVar('--chart-tooltip-bg', 'rgba(255, 255, 255, 0.98)'),
+    tooltipBorder: readThemeVar('--chart-tooltip-border', '#c1c8d1'),
+    tooltipText: readThemeVar('--chart-tooltip-text', '#1f2937'),
+  }
+})
+
+onMounted(() => {
+  themeObserver = new MutationObserver(() => {
+    themeVersion.value += 1
+  })
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme', 'style', 'class'],
+  })
+})
+
+onBeforeUnmount(() => {
+  themeObserver?.disconnect()
+  themeObserver = null
+})
+
 const chartOption = computed(() => {
+  const palette = themePalette.value
   const timestamps = props.trend.map((p) => toTimestamp(p.date))
 
   const medians = props.trend.map((p, idx) => [timestamps[idx], p.median_price] as const)
@@ -66,7 +100,7 @@ const chartOption = computed(() => {
   const xMax = onePoint ? timestamps[0] + 36 * 60 * 60 * 1000 : 'dataMax'
 
   return {
-    color: [SERIES_COLORS.median, SERIES_COLORS.avg, SERIES_COLORS.min, SERIES_COLORS.max],
+    color: [palette.median, palette.avg, palette.min, palette.max],
     animationDuration: 380,
     tooltip: {
       trigger: 'axis',
@@ -74,14 +108,14 @@ const chartOption = computed(() => {
         type: 'cross',
         lineStyle: {
           type: 'dashed',
-          color: '#7f8a99',
+          color: palette.crosshair,
         },
       },
-      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-      borderColor: '#c1c8d1',
+      backgroundColor: palette.tooltipBg,
+      borderColor: palette.tooltipBorder,
       borderWidth: 1,
-      textStyle: { color: '#1f2937' },
-      formatter: (params: any[]) => {
+      textStyle: { color: palette.tooltipText },
+      formatter: (params: TooltipParam[]) => {
         if (!params.length) return ''
         const dataIndex = params[0].dataIndex as number
         const point = props.trend[dataIndex]
@@ -103,7 +137,7 @@ const chartOption = computed(() => {
       itemWidth: 14,
       itemHeight: 8,
       textStyle: {
-        color: '#536170',
+        color: palette.axis,
         fontWeight: 600,
       },
     },
@@ -118,11 +152,11 @@ const chartOption = computed(() => {
       type: 'time',
       min: xMin,
       max: xMax,
-      axisLine: { lineStyle: { color: '#c1c8d1' } },
+      axisLine: { lineStyle: { color: palette.grid } },
       axisTick: { show: false },
       splitLine: { show: false },
       axisLabel: {
-        color: '#536170',
+        color: palette.axis,
         fontSize: 11,
         hideOverlap: true,
         formatter: (value: number) => {
@@ -140,13 +174,13 @@ const chartOption = computed(() => {
       axisTick: { show: false },
       splitLine: {
         lineStyle: {
-          color: 'rgba(127, 138, 153, 0.22)',
+          color: palette.grid,
           type: 'dashed',
         },
       },
       axisLabel: {
         formatter: formatPriceTick,
-        color: '#536170',
+        color: palette.axis,
         fontSize: 11,
       },
     },
@@ -157,7 +191,7 @@ const chartOption = computed(() => {
         data: medians,
         smooth: false,
         lineStyle: { width: 3.2 },
-        areaStyle: { color: 'rgba(29, 78, 137, 0.1)' },
+        areaStyle: { color: `${palette.median}1a` },
         showSymbol: onePoint,
         symbol: 'circle',
         symbolSize: onePoint ? 12 : 7,
@@ -216,8 +250,8 @@ const chartOption = computed(() => {
   left: 7%;
   z-index: 1;
   border-radius: 999px;
-  background: #f5f7fb;
-  color: #64748b;
+  background: var(--chart-note-bg);
+  color: var(--paper-muted);
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 700;

@@ -1,0 +1,221 @@
+/* ==========================================================================
+   Dark Theme Refined - "Virtus" Dashboard Style
+   ========================================================================== */
+
+:root[data-theme='dark'] {
+  /* 1. 核心背景色 - 极致深邃的哑光黑灰 */
+  --paper-bg: #101011;           /* 最底层的暗黑背景 */
+  --paper-bg-soft: #161618;      /* 侧边栏/顶部栏背景 */
+  --paper-surface: #212124;      /* 面板/卡片的主体颜色 */
+  --paper-surface-soft: #2a2a2e; /* 卡片内的次级容器、输入框、Hover状态 */
+
+  --surface-floating: #2a2a2e;   /* 悬浮菜单 */
+  --surface-soft-hover: #323236; /* 强Hover反馈 */
+  --surface-sunken: #1a1a1c;     /* 凹陷输入框底色 */
+
+  /* 2. 边框 - 极度微弱，仅作为边缘的高光点缀 */
+  --paper-border: rgba(255, 255, 255, 0.03);
+  --paper-border-strong: rgba(255, 255, 255, 0.08);
+  --line-soft: rgba(255, 255, 255, 0.03);
+  --line-strong: rgba(255, 255, 255, 0.06);
+
+  /* 3. 字体颜色 - 高对比度白与内敛灰 */
+  --paper-text: #f5f5f5;         /* 主标题 / 强调文字 */
+  --text-strong: #ffffff;        /* 极度强调 */
+  --paper-muted: #8e8e93;        /* 正文 / 次要信息 (参考图中的灰色数字) */
+  --paper-subtle: #636366;       /* 极弱信息 / 占位符 */
+
+  /* 4. 品牌核心主色 - 赤土橙 (Terracotta Orange) */
+  --accent-primary: #b6552e;         /* 标志性的橘色 */
+  --accent-primary-strong: #c76138;  /* Hover时的橘色 */
+  --accent-primary-soft: rgba(182, 85, 46, 0.15); /* 橘色微弱背景 */
+
+  /* 辅助色均向橘色/中性色靠拢，保持盘面整洁 */
+  --text-danger: #ff6b6b;
+  --text-success: #88d18a;
+  --text-warning: #b6552e;       /* 统一为品牌橘 */
+  /* 5. 阴影系统 - 彻底扁平化，摒弃明显投影，依靠底色区分层级 */
+  --paper-shadow: none;
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.15); /* 只有极弱的环境光遮蔽 */
+  --shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.3);
+  --shadow-floating: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--paper-border-strong);
+  --shadow-control: none;
+  --detail-panel-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+
+  /* 6. 图表与数据颜色 */
+  --chart-note-bg: rgba(33, 33, 36, 0.95);
+  --chart-axis: #48484a;
+  --chart-grid: rgba(255, 255, 255, 0.03);
+  --chart-crosshair: #8e8e93;
+  --chart-tooltip-bg: #2a2a2e;
+  --chart-tooltip-border: var(--paper-border);
+  --chart-tooltip-text: var(--paper-text);
+
+  /* 详情页图表曲线与浅色主题保持一致 */
+  --chart-series-median: #dd6647;
+  --chart-series-avg: #b78b16;
+  --chart-series-min: #2c8c67;
+  --chart-series-max: #8e63ce;
+  --chart-spark-avg: #b78b16;
+  --chart-spark-median: #dd6647;
+
+  /* 7. 布局背景 */
+  --layout-page-gradient: var(--paper-bg); /* 参考图是纯色，取消渐变 */
+  --layout-sidebar-bg: var(--paper-bg-soft);
+  --layout-topbar-bg: var(--paper-bg-soft);
+  --layout-sidebar-border-right: none;
+  --layout-sidebar-border-bottom-mobile: none;
+  --layout-topbar-border-bottom: none;
+
+  /* 导航悬浮与激活：参考图中是完整的橘色胶囊 */
+  --layout-nav-hover-bg: #2a2a2e;
+  --layout-nav-hover-text: var(--paper-text);
+  --layout-nav-active-bar: transparent; /* 废弃左侧竖条 */
+  --layout-nav-active-bg: rgba(182, 85, 46, 0.5);
+  --layout-nav-active-text: var(--paper-text);
+  --nav-item-radius: 999px;
+  --nav-item-margin: 4px 12px;
+  --nav-item-padding: 10px 16px;
+  --nav-item-color: var(--paper-muted);
+  --nav-item-active-weight: 500;
+
+  --surface-panel-bg: var(--paper-surface);
+  --surface-panel-border: 1px solid var(--paper-border);
+  --surface-panel-shadow: var(--shadow-card);
+  --surface-panel-radius: 20px;
+  --surface-panel-padding: 20px;
+  --surface-panel-inner-bg: var(--paper-surface-soft);
+  --surface-panel-inner-border: 1px solid var(--paper-border);
+  --surface-panel-inner-radius: 14px;
+
+  --control-input-bg: var(--surface-sunken);
+  --control-input-border: 1px solid var(--paper-border-strong);
+  --control-input-focus-border: var(--accent-primary);
+  --control-input-focus-bg: var(--surface-sunken);
+  --control-input-shadow: none;
+  --control-input-focus-shadow: none;
+  --control-primary-shadow: none;
+  --control-primary-hover-shadow: none;
+
+  --type-emphasis-weight: 500;
+  --type-emphasis-letter-spacing: -0.5px;
+  --type-muted-color: var(--paper-muted);
+
+  --table-surface-bg: transparent;
+  --table-head-bg: #2a2a2e;
+  --table-head-color: #f1dfd3;
+  --table-head-border: 1px solid var(--paper-border-strong);
+  --table-head-wrapper-bg: #2a2a2e;
+  --table-cell-border: 1px solid var(--line-soft);
+  --table-row-bg: rgba(255, 255, 255, 0.01);
+  --table-row-striped-bg: rgba(255, 255, 255, 0.03);
+  --table-fixed-bg: #212124;
+  --table-wrapper-bg: #212124;
+
+  --heat-low-rgb: 88, 142, 255;
+  --heat-normal-rgb: 214, 170, 38;
+  --heat-high-rgb: 182, 85, 46;
+  --heat-cell-text: #f6e8df;
+  --heat-cell-none-bg: rgba(255, 255, 255, 0.03);
+  --heat-cell-none-border: rgba(255, 255, 255, 0.08);
+  --heat-cell-none-text: #8e8e93;
+  --heat-cell-hover-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  --table-trend-bg: rgba(255, 255, 255, 0.04);
+  --table-trend-border: 1px solid rgba(255, 255, 255, 0.06);
+  --table-trend-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+
+  --tag-pill-border: 1px solid var(--paper-border-strong);
+  --tag-pill-radius: 999px;
+  --tag-pill-weight: 500;
+
+  --dashboard-metric-card-blue: linear-gradient(135deg, rgba(182, 85, 46, 0.4) 0%, rgba(182, 85, 46, 0.08) 100%);
+  --dashboard-metric-card-green: linear-gradient(145deg, rgba(182, 85, 46, 0.34) 0%, rgba(182, 85, 46, 0.04) 100%);
+  --dashboard-metric-card-amber: linear-gradient(135deg, rgba(182, 85, 46, 0.46) 0%, rgba(182, 85, 46, 0.1) 100%);
+  --dashboard-metric-card-purple: linear-gradient(160deg, rgba(182, 85, 46, 0.3) 0%, rgba(182, 85, 46, 0.02) 100%);
+  --dashboard-metric-text: #f6e8df;
+  --dashboard-metric-muted: rgba(246, 232, 223, 0.76);
+  --dashboard-metric-icon: rgba(246, 232, 223, 0.84);
+
+  --detail-hero-panel-bg:
+    linear-gradient(135deg, rgba(182, 85, 46, 0.26) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(27, 22, 20, 0.98) 0%, rgba(20, 18, 17, 0.98) 100%);
+  --detail-hero-text: var(--text-on-dark);
+  --detail-hero-muted: var(--text-on-dark-muted);
+  --detail-hero-button-border: rgba(229, 237, 245, 0.5);
+  --detail-hero-button-bg: rgba(255, 255, 255, 0.12);
+  --detail-hero-button-bg-hover: rgba(255, 255, 255, 0.22);
+  --detail-panel-bg:
+    linear-gradient(180deg, rgba(30, 25, 23, 0.98) 0%, rgba(22, 20, 19, 0.96) 100%);
+  --detail-chart-panel-bg:
+    linear-gradient(180deg, rgba(33, 27, 25, 0.98) 0%, rgba(182, 85, 46, 0.08) 100%);
+  --detail-card-border: rgba(182, 85, 46, 0.16);
+  --detail-row-border: rgba(182, 85, 46, 0.18);
+
+  /* Element Plus 全局覆盖 */
+  --el-color-primary: var(--accent-primary);
+  --el-bg-color: var(--paper-bg);
+  --el-border-color: var(--paper-border);
+}
+
+/* 全局主打：亮橘色高亮卡片 (模拟图中 lisan jone 的卡片) */
+:root[data-theme='dark'] .card-highlight,
+:root[data-theme='dark'] .alert-object.critical {
+  background: var(--accent-primary) !important;
+  border: none !important;
+  color: #fff !important;
+}
+:root[data-theme='dark'] .card-highlight *,
+:root[data-theme='dark'] .alert-object.critical * {
+  color: #fff !important;
+}
+
+/* 次级/幽灵按钮：深灰底色 */
+:root[data-theme='dark'] .sidebar-toggle, :root[data-theme='dark'] .theme-toggle,
+:root[data-theme='dark'] .view-tabs button:not(.active),
+:root[data-theme='dark'] .ops-page .el-button--default {
+  background: var(--surface-sunken) !important;
+  border: 1px solid var(--paper-border-strong) !important;
+  color: var(--paper-text) !important;
+}
+:root[data-theme='dark'] .ops-page .el-button--default:hover {
+  background: var(--paper-surface-soft) !important;
+}
+
+/* 搜索框与输入框：深色胶囊 */
+:root[data-theme='dark'] .ops-page .el-select__wrapper {
+  color: var(--paper-text) !important;
+  box-shadow: none !important;
+  padding: 4px 16px;
+}
+
+/* 品牌色文字强调 */
+:root[data-theme='dark'] .match-title, :root[data-theme='dark'] .price-line strong,
+:root[data-theme='dark'] .deal-item em {
+  color: var(--accent-primary) !important;
+}
+
+/* 徽章与标签 Tag：纯黑底/深灰底 + 细边框 */
+:root[data-theme='dark'] .el-tag,
+:root[data-theme='dark'] .keyword-cell .el-tag {
+  background: var(--surface-sunken) !important;
+  color: var(--paper-muted) !important;
+}
+
+/* 进度条：哑光橘色 */
+:root[data-theme='dark'] .el-progress-bar__outer { background: var(--surface-sunken) !important; }
+:root[data-theme='dark'] .el-progress-bar__inner { background: var(--accent-primary) !important; }
+
+/* 下拉菜单浮层 */
+:root[data-theme='dark'] .el-popper, :root[data-theme='dark'] .el-select-dropdown {
+  background: var(--surface-floating) !important;
+  border: 1px solid var(--paper-border-strong) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow-floating) !important;
+}
+:root[data-theme='dark'] .el-select-dropdown__item.hover,
+:root[data-theme='dark'] .el-select-dropdown__item:hover {
+  background: var(--surface-soft-hover) !important;
+  color: var(--paper-text) !important;
+  border-radius: 8px;
+  margin: 0 8px;
+}

@@ -1,16 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
-import HardwareDetailView from '@/views/HardwareDetailView.vue'
-import AlertsView from '@/views/AlertsView.vue'
-import CrawlerHealthView from '@/views/CrawlerHealthView.vue'
-import HardwarePoolAdminView from '@/views/HardwarePoolAdminView.vue'
-import DealsView from '@/views/DealsView.vue'
+
+const LandingPage = () => import('@/views/LandingPage.vue')
+const HomeView = () => import('@/views/HomeView.vue')
+const HardwareDetailView = () => import('@/views/HardwareDetailView.vue')
+const AlertsView = () => import('@/views/AlertsView.vue')
+const CrawlerHealthView = () => import('@/views/CrawlerHealthView.vue')
+const HardwarePoolAdminView = () => import('@/views/HardwarePoolAdminView.vue')
+const DealsView = () => import('@/views/DealsView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
+      name: 'landing',
+      component: LandingPage,
+    },
+    {
+      path: '/home',
       name: 'home',
       component: HomeView,
     },

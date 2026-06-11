@@ -1,4 +1,4 @@
-# 开发环境一键自举脚本（Windows PowerShell）
+﻿# 开发环境一键自举脚本（Windows PowerShell）
 # 作用：检测必备工具、装后端/前端依赖、拉 Playwright Firefox、跑数据库迁移
 # 不会自动安装 PostgreSQL、Python、Node —— 这些请按下方提示自行安装
 
@@ -17,7 +17,7 @@ function Require-Cmd($cmd, $hint) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
         Write-Fail "未检测到 $cmd。请先安装：$hint"
     }
-    Write-Ok "$cmd: $((Get-Command $cmd).Source)"
+    Write-Ok "${cmd}: $((Get-Command $cmd).Source)"
 }
 
 # ── 1. 工具检查 ──────────────────────────────────
