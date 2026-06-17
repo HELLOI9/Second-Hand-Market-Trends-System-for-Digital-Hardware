@@ -1,4 +1,4 @@
-from datetime import date
+from app.core.timezone import today_cst
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +21,7 @@ async def run_single_hardware_crawl(
     validation_limit: int = 25,
     replace_today: bool = True,
 ) -> dict:
-    today = date.today()
+    today = today_cst()
     if replace_today:
         await db.execute(
             delete(DailyStats).where(
@@ -43,7 +43,7 @@ async def run_single_hardware_crawl(
 
     validation_rows = (
         await db.execute(
-            select(PriceSnapshot, HardwareItem.name)
+            select(PriceSnapshot, HardwareItem.name, HardwareItem.validation_rule)
             .join(HardwareItem, PriceSnapshot.hardware_id == HardwareItem.id)
             .where(
                 PriceSnapshot.hardware_id == hardware.id,

@@ -7,6 +7,7 @@ const AlertsView = () => import('@/views/AlertsView.vue')
 const CrawlerHealthView = () => import('@/views/CrawlerHealthView.vue')
 const HardwarePoolAdminView = () => import('@/views/HardwarePoolAdminView.vue')
 const DealsView = () => import('@/views/DealsView.vue')
+const ConfigView = () => import('@/views/ConfigView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +47,11 @@ const router = createRouter({
       path: '/health/crawler',
       name: 'crawler-health',
       component: CrawlerHealthView,
+    },
+    {
+      path: '/config',
+      name: 'config',
+      component: ConfigView,
     },
   ],
 })

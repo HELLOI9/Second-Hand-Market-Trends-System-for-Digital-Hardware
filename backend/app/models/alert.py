@@ -1,9 +1,12 @@
 from datetime import datetime
 
+from app.core.timezone import now_cst
+
 from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.timezone import now_cst
 
 
 class PriceAlert(Base):
@@ -19,14 +22,14 @@ class PriceAlert(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_fired_at: Mapped[datetime | None] = mapped_column(DateTime)
     cooldown_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_cst)
 
 
 class CrawlRun(Base):
     __tablename__ = "crawl_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_cst)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
     success: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

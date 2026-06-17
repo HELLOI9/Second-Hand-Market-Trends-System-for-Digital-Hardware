@@ -23,24 +23,38 @@ async def _scheduled_crawl():
     logger.info("定时任务完成：%s", summary)
 
 
-def start_scheduler():
-    # CRAWLER_SCHEDULE 格式: "minute hour day month day_of_week"
-    parts = settings.crawler_schedule.split()
-    if len(parts) == 5:
-        minute, hour, day, month, day_of_week = parts
-    else:
-        # 默认凌晨 2 点
-        minute, hour, day, month, day_of_week = "0", "2", "*", "*", "*"
+def _parse_schedule_times(times_str: str) -> list[tuple[str, str]]:
+    """Parse 'HH:MM,HH:MM,...' into list of (hour, minute) tuples."""
+    result = []
+    for token in times_str.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        parts = token.split(":")
+        if len(parts) == 2:
+            try:
+                h, m = int(parts[0]), int(parts[1])
+                if 0 <= h <= 23 and 0 <= m <= 59:
+                    result.append((str(h), str(m)))
+            except ValueError:
+                pass
+    return result or [("2", "0")]
 
-    scheduler.add_job(
-        _scheduled_crawl,
-        CronTrigger(minute=minute, hour=hour, day=day, month=month, day_of_week=day_of_week),
-        id="daily_crawl",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
+
+def start_scheduler():
+    times = _parse_schedule_times(settings.crawler_schedule_times)
+
+    for i, (hour, minute) in enumerate(times):
+        scheduler.add_job(
+            _scheduled_crawl,
+            CronTrigger(hour=hour, minute=minute),
+            id=f"daily_crawl_{i}",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
     scheduler.start()
-    logger.info("调度器已启动，爬取计划：%s", settings.crawler_schedule)
+    logger.info("调度器已启动，爬取时间点：%s", settings.crawler_schedule_times)
 
 
 def stop_scheduler():

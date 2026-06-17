@@ -2,25 +2,24 @@
   <div class="ops-page" :class="{ 'is-collapsed': isCollapsed }">
     <aside class="ops-sidebar">
       <div class="sidebar-head">
-        <RouterLink class="brand" :to="{ name: 'home' }" :title="isCollapsed ? brandName : undefined">
+        <RouterLink class="brand" :to="{ name: 'landing' }" :title="isCollapsed ? brandName : undefined">
           <span class="brand-mark">
-            <img class="brand-logo" :src="isDarkMode ? landingLogo : hardpulseLogo" alt="hardpulse logo" />
+            <img class="brand-logo" :src="hardpulseLogo" alt="hardpulse logo" />
           </span>
           <div class="brand-copy">
             <strong>{{ brandName }}</strong>
           </div>
         </RouterLink>
+        <button
+          class="sidebar-toggle"
+          type="button"
+          :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          @click="toggleSidebar"
+        >
+          <el-icon><component :is="isCollapsed ? ArrowRightBold : ArrowLeftBold" /></el-icon>
+        </button>
       </div>
-
-      <button
-        class="sidebar-toggle"
-        type="button"
-        :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
-        :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
-        @click="toggleSidebar"
-      >
-        <el-icon><component :is="isCollapsed ? ArrowRightBold : ArrowLeftBold" /></el-icon>
-      </button>
 
       <nav class="ops-nav" aria-label="主导航">
         <RouterLink
@@ -35,22 +34,12 @@
         </RouterLink>
       </nav>
 
-      <div class="system-card" :title="isCollapsed ? `${systemPrimary} ${systemSecondary}` : undefined">
-        <span class="system-label">系统状态</span>
-        <strong><i></i>{{ systemPrimary }}</strong>
-        <span>{{ systemSecondary }}</span>
+      <div class="system-card" :title="isCollapsed ? (backendOnline ? '后端已连接' : '后端未连接') : undefined">
+        <strong>
+          <i :class="backendOnline ? 'dot-online' : 'dot-offline'"></i>
+          <span>{{ backendOnline ? '后端已连接' : '后端未连接' }}</span>
+        </strong>
       </div>
-
-      <button
-        class="theme-toggle"
-        type="button"
-        :title="isDarkMode ? '切换到日间模式' : '切换到黑夜模式'"
-        :aria-label="isDarkMode ? '切换到日间模式' : '切换到黑夜模式'"
-        @click="toggleTheme"
-      >
-        <el-icon><component :is="isDarkMode ? Sunny : Moon" /></el-icon>
-        <span>{{ isDarkMode ? '日间模式' : '黑夜模式' }}</span>
-      </button>
     </aside>
 
     <section class="ops-workspace">
@@ -94,20 +83,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { Aim, ArrowLeftBold, ArrowRightBold, Bell, Grid, Monitor, Moon, Search, Setting, Sunny } from '@element-plus/icons-vue'
+import { Aim, ArrowLeftBold, ArrowRightBold, Bell, Grid, Monitor, Search, Setting, Tools } from '@element-plus/icons-vue'
 import { hardwareApi } from '@/api'
 import type { HardwareDetail } from '@/api/types'
 import hardpulseLogo from '@/assets/hardpulse-logo.png'
-import landingLogo from '@/assets/landing-logo.png'
 
-type NavName = 'home' | 'deals' | 'hardware-admin' | 'alerts' | 'crawler-health'
+type NavName = 'home' | 'deals' | 'hardware-admin' | 'alerts' | 'crawler-health' | 'config'
 
 const props = withDefaults(defineProps<{
   activeNav: NavName
-  systemPrimary: string
-  systemSecondary: string
   brandName?: string
   mainClass?: string
 }>(), {
@@ -119,10 +105,11 @@ const SIDEBAR_STORAGE_KEY = 'ops-sidebar-collapsed'
 const THEME_STORAGE_KEY = 'ops-theme'
 const router = useRouter()
 const isCollapsed = ref(readStoredSidebarState())
-const isDarkMode = ref(readStoredTheme() === 'dark')
 const searchLoading = ref(false)
 const selectedSearchHardwareId = ref('')
 const groupedHardware = ref<Record<string, HardwareDetail[]>>({})
+const backendOnline = ref(true)
+let pingTimer: number | undefined
 
 const navItems = computed(() => [
   { name: 'home' as const, label: '监控概览', icon: Grid },
@@ -130,6 +117,7 @@ const navItems = computed(() => [
   { name: 'hardware-admin' as const, label: '订阅管理', icon: Setting },
   { name: 'alerts' as const, label: '价格提醒', icon: Bell },
   { name: 'crawler-health' as const, label: '采集健康', icon: Monitor },
+  { name: 'config' as const, label: '系统配置', icon: Tools },
 ])
 
 const activeHardwareOptions = computed(() => {
@@ -146,20 +134,6 @@ function toggleSidebar() {
 function readStoredSidebarState() {
   if (typeof window === 'undefined') return false
   return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1'
-}
-
-function readStoredTheme(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'light'
-  return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
-}
-
-function applyTheme(theme: 'light' | 'dark') {
-  document.documentElement.dataset.theme = theme
-  isDarkMode.value = theme === 'dark'
-}
-
-function toggleTheme() {
-  applyTheme(isDarkMode.value ? 'light' : 'dark')
 }
 
 async function loadHardwareOptions() {
@@ -179,17 +153,27 @@ function jumpToSelectedHardware(value: string | number | boolean | undefined) {
   void router.push({ name: 'hardware-detail', params: { id: String(value) } })
 }
 
+async function pingBackend() {
+  try {
+    const res = await fetch('/api/../health', { signal: AbortSignal.timeout(4000) })
+    backendOnline.value = res.ok
+  } catch {
+    backendOnline.value = false
+  }
+}
+
 onMounted(() => {
-  applyTheme(readStoredTheme())
   void loadHardwareOptions()
+  void pingBackend()
+  pingTimer = window.setInterval(pingBackend, 30_000)
+})
+
+onUnmounted(() => {
+  if (pingTimer) window.clearInterval(pingTimer)
 })
 
 watch(isCollapsed, (value) => {
   localStorage.setItem(SIDEBAR_STORAGE_KEY, value ? '1' : '0')
-})
-
-watch(isDarkMode, (value) => {
-  localStorage.setItem(THEME_STORAGE_KEY, value ? 'dark' : 'light')
 })
 </script>
 
@@ -198,6 +182,9 @@ watch(isDarkMode, (value) => {
 
 .ops-workspace {
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: none;
 }
 
 .topbar {

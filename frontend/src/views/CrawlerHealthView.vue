@@ -1,8 +1,6 @@
 <template>
   <OpsLayout
     active-nav="crawler-health"
-    system-primary="后端实时已连接"
-    :system-secondary="health?.latest_run?.started_at ? `更新于 ${formatDate(health.latest_run.started_at)}` : '等待首次更新'"
   >
     <template #header>
       <header class="ops-header">
@@ -37,7 +35,7 @@
           <article class="health-card">
             <span>采集轮次</span>
             <strong>{{ health.run_count }}</strong>
-            <small>{{ health.latest_run?.status ?? '暂无运行记录' }}</small>
+            <small>{{ health.latest_run ? formatRunStatus(health.latest_run.status) : '暂无运行记录' }}</small>
           </article>
         </section>
 
@@ -57,6 +55,99 @@
             <div><span>失败</span><strong>{{ health.latest_run.failed }}</strong></div>
             <div><span>跳过</span><strong>{{ health.latest_run.skipped }}</strong></div>
             <div><span>结束时间</span><strong class="time-value">{{ health.latest_run.ended_at ? formatDateTime(health.latest_run.ended_at) : '-' }}</strong></div>
+          </div>
+
+          <template v-if="isRunning && health.latest_run?.progress">
+            <div class="progress-block">
+              <!-- 爬取进度 -->
+              <div class="progress-row">
+                <div class="progress-meta">
+                  <span class="progress-label">
+                    <strong>爬取</strong>
+                    <template v-if="health.latest_run.progress.current_hardware">
+                      · {{ health.latest_run.progress.current_hardware }}
+                    </template>
+                  </span>
+                  <span class="progress-pct">{{ health.latest_run.progress.crawl_done }} / {{ health.latest_run.progress.crawl_total }}</span>
+                </div>
+                <el-progress
+                  :percentage="health.latest_run.progress.crawl_percent"
+                  :status="progressStatus"
+                  stroke-width="10"
+                  color="#6366f1"
+                />
+              </div>
+              <!-- LLM 校验进度 -->
+              <div class="progress-row">
+                <div class="progress-meta">
+                  <span class="progress-label">
+                    <strong>LLM 校验</strong>
+                    <template v-if="health.latest_run.progress.llm_current_hardware">
+                      · {{ health.latest_run.progress.llm_current_hardware }}
+                    </template>
+                    <template v-else>
+                      · 等待中
+                    </template>
+                  </span>
+                  <span class="progress-pct">
+                    <template v-if="health.latest_run.progress.llm_current_done != null">
+                      当前硬件 {{ health.latest_run.progress.llm_current_done }} / {{ health.latest_run.progress.llm_current_total }}
+                    </template>
+                    <template v-else>-</template>
+                  </span>
+                </div>
+                <el-progress
+                  :percentage="health.latest_run.progress.llm_current_total ? Math.round((health.latest_run.progress.llm_current_done ?? 0) / health.latest_run.progress.llm_current_total * 100) : 0"
+                  stroke-width="10"
+                  color="#10b981"
+                />
+              </div>
+            </div>
+          </template>
+        </section>
+
+        <!-- 单硬件采集进度 -->
+        <section v-if="health.active_hw_crawls?.length" class="run-panel">
+          <div class="panel-head">
+            <div>
+              <h2>单硬件采集</h2>
+              <span>当前正在执行的单硬件采集任务</span>
+            </div>
+          </div>
+          <div class="hw-crawl-list">
+            <article v-for="hwc in health.active_hw_crawls" :key="hwc.hardware_id" class="hw-crawl-item">
+              <div class="hw-crawl-name">{{ hwc.hardware_name }}</div>
+              <template v-if="hwc.progress">
+                <div class="progress-row">
+                  <div class="progress-meta">
+                    <span class="progress-label"><strong>爬取</strong></span>
+                    <span class="progress-pct">{{ hwc.progress.crawl_done }} / {{ hwc.progress.crawl_total }}</span>
+                  </div>
+                  <el-progress
+                    :percentage="hwc.progress.crawl_percent"
+                    stroke-width="10"
+                    color="#6366f1"
+                  />
+                </div>
+                <div class="progress-row">
+                  <div class="progress-meta">
+                    <span class="progress-label"><strong>LLM 校验</strong></span>
+                    <span class="progress-pct">
+                      <template v-if="hwc.progress.llm_current_done != null">
+                        {{ hwc.progress.llm_current_done }} / {{ hwc.progress.llm_current_total }}
+                      </template>
+                      <template v-else>等待中</template>
+                    </span>
+                  </div>
+                  <el-progress
+                    :percentage="hwc.progress.llm_percent"
+                    stroke-width="10"
+                    color="#10b981"
+                  />
+                </div>
+              </template>
+              <div v-else class="hw-crawl-waiting">准备中…</div>
+            </article>
           </div>
         </section>
 
@@ -97,14 +188,24 @@ let refreshTimer: number | undefined
 
 const isRunning = computed(() => {
   const status = health.value?.latest_run?.status
-  return status === 'running' || status === 'crawling' || status === 'validating' || status === 'aggregating'
+  const fullRunActive = status === 'running' || status === 'crawling'
+  const hwCrawlActive = (health.value?.active_hw_crawls?.length ?? 0) > 0
+  return fullRunActive || hwCrawlActive
 })
 
 const runTagType = computed(() => {
   const status = health.value?.latest_run?.status
   if (status === 'success') return 'success'
   if (status === 'partial' || status === 'failed') return 'warning'
+  if (status === 'interrupted') return 'danger'
   return 'info'
+})
+
+const progressStatus = computed(() => {
+  const status = health.value?.latest_run?.status
+  if (status === 'success') return 'success'
+  if (status === 'partial' || status === 'failed') return 'warning'
+  return ''
 })
 
 onMounted(async () => {
@@ -148,9 +249,7 @@ function formatRunStatus(status: string): string {
     failed: '失败',
     running: '运行中',
     crawling: '采集中',
-    validating: '校验中',
-    aggregating: '聚合中',
-    paused: '已暂停',
+    interrupted: '已中断',
   }
   return labels[status] ?? status
 }
@@ -184,6 +283,9 @@ function formatDateTime(value: string): string {
 
 .health-card {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .health-card span,
@@ -272,6 +374,50 @@ function formatDateTime(value: string): string {
   font-size: 16px;
 }
 
+.progress-block {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
+  background: var(--paper-surface-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--paper-muted);
+}
+
+.progress-label strong {
+  color: var(--paper-text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.progress-pct {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--paper-muted);
+}
+
+.progress-row :deep(.el-progress__text) {
+  font-size: 11px !important;
+  font-weight: 800;
+  color: var(--el-color-primary) !important;
+}
+
 .alert-stack {
   display: flex;
   flex-direction: column;
@@ -307,6 +453,28 @@ function formatDateTime(value: string): string {
   margin-top: 3px;
   color: var(--paper-muted);
   font-size: 13px;
+}
+
+.hw-crawl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hw-crawl-item {
+  padding: 14px 16px;
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
+  background: var(--paper-surface-soft);
+}
+
+.hw-crawl-item h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.hw-crawl-item h3 .el-tag {
+  margin-left: 8px;
 }
 
 @media (max-width: 1000px) {

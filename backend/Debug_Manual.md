@@ -1,4 +1,4 @@
-# 测试说明
+# 维护脚本手册
 
 ## 目录结构
 
@@ -135,6 +135,7 @@ python rerun_one_hardware.py --hardware-name "i7-14700K" --pages 3
 
 ```bash
 python rerun_one_hardware.py --hardware-name "i7-14700K" --verbose-llm
+```
 
 ### 清除整个数据库并重写硬件池（慎用！）
 

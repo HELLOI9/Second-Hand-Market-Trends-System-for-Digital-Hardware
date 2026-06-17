@@ -5,15 +5,12 @@
   --sidebar-padding-y: 18px;
   --topbar-padding-x: 28px;
   --ops-main-padding-x: 40px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   background: var(--layout-page-gradient);
   color: var(--paper-text);
-  transition:
-    background var(--motion-base) var(--ease-standard),
-    color var(--motion-base) var(--ease-standard),
-    grid-template-columns var(--motion-base) var(--ease-standard);
 }
 
 .ops-sidebar {
@@ -28,13 +25,7 @@
   padding: var(--sidebar-padding-y) var(--sidebar-padding-x);
   display: flex;
   flex-direction: column;
-  overflow: visible;
-  transition:
-    padding var(--motion-base) var(--ease-standard),
-    width var(--motion-base) var(--ease-standard),
-    background var(--motion-base) var(--ease-standard),
-    border-color var(--motion-base) var(--ease-standard),
-    transform var(--motion-base) var(--ease-standard);
+  overflow: hidden;
 }
 
 .brand,
@@ -90,37 +81,28 @@
 }
 
 .sidebar-toggle {
-  position: absolute;
-  right: -17px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  border: 1px solid var(--control-ghost-border);
-  border-radius: 50%;
-  background: var(--control-ghost-bg);
-  color: var(--control-ghost-text);
-  display: inline-flex;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--nav-item-color);
+  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: var(--shadow-floating);
   transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-emphasized);
-  padding: 0;
-  line-height: 1;
+    background 0.15s var(--ease-standard),
+    color 0.15s var(--ease-standard),
+    border-color 0.15s var(--ease-standard),
+    opacity 0.2s var(--ease-standard);
 }
 
 .sidebar-toggle:hover {
-  border-color: var(--control-ghost-border-hover);
-  background: var(--control-ghost-bg-hover);
-  color: var(--control-ghost-text-hover);
-  transform: translateY(-50%) scale(1.04);
+  background: var(--layout-nav-hover-bg);
+  color: var(--layout-nav-hover-text);
 }
 
 .ops-nav {
@@ -137,8 +119,7 @@
   border: 0;
   border-radius: var(--nav-item-radius);
   background: transparent;
-  display: grid;
-  grid-template-columns: 22px 1fr;
+  display: flex;
   align-items: center;
   gap: 10px;
   padding: var(--nav-item-padding);
@@ -146,7 +127,6 @@
   color: var(--nav-item-color);
   font-size: 13px;
   font-weight: 800;
-  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   transition:
@@ -155,7 +135,13 @@
     transform var(--motion-fast) var(--ease-emphasized);
 }
 
+.ops-nav a .el-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
 .ops-nav a span {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -187,8 +173,8 @@
 }
 
 .system-card {
-  margin-top: 18px;
-  padding: 16px;
+  margin-top: auto;
+  padding: 12px 16px;
   border: 1px dashed var(--paper-border);
   border-radius: var(--radius-card);
   background: var(--surface-glass);
@@ -198,62 +184,47 @@
     box-shadow var(--motion-base) var(--ease-standard);
 }
 
-.system-label,
-.system-card span:last-child {
-  display: block;
-  color: #8290a3;
-  font-size: 11px;
-  font-weight: 700;
-}
-
 .system-card strong {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 8px 0 4px;
-  color: #203049;
+  margin: 0;
+  color: var(--text-strong);
   font-size: 12px;
+  font-weight: 800;
 }
 
-.system-card i {
+.system-card strong span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dot-online,
+.dot-offline {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: var(--radius-pill);
+}
+
+.dot-online {
   background: #19c58a;
+  box-shadow: 0 0 6px #19c58a88;
 }
 
-.theme-toggle {
-  width: 100%;
-  margin-top: auto;
-  min-height: 42px;
-  border: 1px solid var(--control-ghost-border);
-  border-radius: var(--radius-soft);
-  background: var(--control-ghost-bg);
-  color: var(--control-ghost-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-emphasized),
-    color var(--motion-fast) var(--ease-standard);
+.dot-offline {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef444488;
 }
 
-.theme-toggle:hover {
-  border-color: var(--control-ghost-border-hover);
-  background: var(--control-ghost-bg-hover);
-  transform: translateY(-1px);
-}
 
 .ops-workspace {
   grid-column: 2;
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .ops-main {
@@ -363,8 +334,10 @@
 }
 
 .ops-page.is-collapsed .sidebar-head {
-  justify-content: center;
-  margin-bottom: 20px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
 }
 
 .ops-page.is-collapsed .brand {
@@ -376,14 +349,14 @@
 
 .ops-page.is-collapsed .brand-copy,
 .ops-page.is-collapsed .ops-nav a span,
-.ops-page.is-collapsed .system-card span:last-child,
-.ops-page.is-collapsed .system-card strong {
+.ops-page.is-collapsed .system-card strong span {
   display: none;
 }
 
+/* reset margin so icon fills the full sidebar width, then center it */
 .ops-page.is-collapsed .ops-nav a {
-  grid-template-columns: 1fr;
-  justify-items: center;
+  justify-content: center;
+  margin: 4px 0;
   padding: 0;
   border-radius: var(--radius-soft);
 }
@@ -393,31 +366,15 @@
 }
 
 .ops-page.is-collapsed .system-card {
-  margin-top: 14px;
-  padding: 14px 10px;
+  margin-top: auto;
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.ops-page.is-collapsed .system-label {
-  position: relative;
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-pill);
-  overflow: hidden;
-  color: transparent;
-  background: #19c58a;
-}
-
-.ops-page.is-collapsed .theme-toggle {
-  width: 44px;
-  padding: 0;
-  align-self: center;
-}
-
-.ops-page.is-collapsed .theme-toggle span {
-  display: none;
+.ops-page.is-collapsed .system-card strong {
+  justify-content: center;
 }
 
 @keyframes ops-content-enter {

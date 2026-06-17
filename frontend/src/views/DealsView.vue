@@ -1,14 +1,12 @@
 <template>
   <OpsLayout
     active-nav="deals"
-    system-primary="后端实时已连接"
-    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
   >
     <template #header>
       <header class="ops-header">
         <div class="ops-header-copy">
           <h1 class="ops-header-title"><el-icon><Aim /></el-icon>今日捡漏</h1>
-          <p class="ops-header-subtitle">样本价低于近 30 天基准中位价 15% 以上时进入候选。</p>
+          <p class="ops-header-subtitle">当天最新一轮有效样本中，价格低于近 30 天历史中位价 15% 以上，每款硬件取最低一条。</p>
         </div>
         <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadDeals">刷新</el-button>
       </header>

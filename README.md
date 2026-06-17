@@ -1,232 +1,278 @@
-# Second-Hand Market Trends System for Digital Hardware
+# HardPulse — 二手数码硬件行情系统
 
-一个面向固定硬件池的二手行情采集与可视化系统。
-当前版本聚焦闲鱼数据，提供「采集 -> 清洗 -> LLM 校验 -> 聚合 -> 前端可视化」的完整链路。
+面向固定硬件池的闲鱼行情采集与可视化系统。
 
-## 1. 项目概览
+**爬取（Playwright）→ 规则过滤 → LLM 语义校验 → 离群值过滤 → 日聚合 → 前端可视化**
 
-本项目用于持续追踪 CPU / GPU / 内存 / SSD 的二手价格趋势，核心能力包括：
+---
 
-- 固定硬件池管理（避免关键词漂移）
-- 闲鱼搜索结果抓取（Playwright + API 拦截）
-- 规则过滤 + LLM 语义过滤
-- 每日统计聚合（中位价、均价、区间、样本数、价格等级）
-- 多视图展示（热力矩阵 / 表格趋势 / 卡片）
-- 单硬件详情分析（7/30/90 天趋势 + 风险/估值/样本可信度）
+## 技术栈
 
-## 2. 技术栈
+| 层级 | 选型 |
+|---|---|
+| 后端 API | Python 3.12 + FastAPI + uvicorn |
+| 数据库 | PostgreSQL 16 + SQLAlchemy 2.x async + asyncpg + Alembic |
+| 爬虫 | Playwright (Firefox)，拦截闲鱼 mtop XHR |
+| LLM 校验 | httpx + OpenAI 兼容协议（OpenAI / DeepSeek / Qwen / 本地 Ollama 均可） |
+| 统计聚合 | NumPy（log 空间 DBSCAN / MAD 离群值过滤） |
+| 定时任务 | APScheduler |
+| 前端 | Vue 3 + TypeScript + Vite + ECharts + Element Plus + vue3-spline |
+| 包管理 | pip / uv（Python），pnpm（Node） |
 
-### 后端（`backend/`）
+---
 
-- `Python 3.12+`
-- `FastAPI` + `SQLAlchemy 2.x` + `asyncpg` + `Alembic`
-- `Playwright`（Firefox 抓取与接口拦截）
-- `httpx`（调用 OpenAI 兼容 LLM 服务）
-- `APScheduler`（定时任务）
-- `NumPy`（统计聚合）
-- `Pydantic` / `pydantic-settings`
+## 项目结构
 
-### 前端（`frontend/`）
-
-- `Vue 3` + `TypeScript` + `Vite 5`
-- `Vue Router 4` + `Pinia`
-- `Element Plus` + `ECharts` + `vue-echarts` + `Axios`
-
-### 数据层
-
-- `PostgreSQL 16`
-- 三张核心业务表：`hardware_items`、`price_snapshots`、`daily_stats`
-
-## 3. 项目结构
-
-```text
+```
 .
-├── backend/                     # FastAPI 后端
-│   ├── app/                     # 应用代码（api / core / crawler / models / scheduler / schemas / services）
-│   ├── alembic/                 # 数据库迁移
-│   ├── reset_backend_data.py    # 清空业务数据并按硬件池重建
-│   ├── rerun_one_hardware.py    # 单硬件当日重跑
-│   ├── revalidate.py            # 历史快照重跑校验
-│   ├── test_crawl.py            # 单关键词抓取调试
-│   └── README.md
-├── frontend/                    # Vue 前端
-│   └── src/                     # 视图、组件、API 封装、路由
+├── backend/
+│   ├── app/
+│   │   ├── api/                # FastAPI 路由
+│   │   │   ├── hardware.py     # 硬件池 CRUD + 趋势 + 样本
+│   │   │   ├── crawler.py      # 爬虫触发 / 暂停 / 状态
+│   │   │   ├── validator.py    # LLM 校验任务
+│   │   │   ├── deals.py        # 今日捡漏
+│   │   │   ├── alerts.py       # 价格提醒 CRUD
+│   │   │   └── health.py       # 采集健康
+│   │   ├── core/
+│   │   │   ├── config.py       # 环境变量读取（pydantic-settings）
+│   │   │   ├── database.py     # SQLAlchemy async 引擎
+│   │   │   └── hardware_pool.py # 硬件池初始数据
+│   │   ├── crawler/
+│   │   │   └── xianyu.py       # Playwright Firefox 爬虫
+│   │   ├── models/             # SQLAlchemy ORM 模型
+│   │   ├── scheduler/          # APScheduler 定时任务
+│   │   ├── schemas/            # Pydantic 输出模型
+│   │   ├── services/           # 业务逻辑
+│   │   │   ├── crawler_service.py
+│   │   │   ├── stats.py        # 清洗 + 聚合
+│   │   │   ├── llm_validator.py
+│   │   │   ├── deals_service.py
+│   │   │   ├── health_service.py
+│   │   │   └── notifier.py     # Webhook / Telegram 通知
+│   │   └── main.py
+│   ├── alembic/versions/       # 数据库迁移（0001 → 0007）
+│   ├── test_crawl.py           # 单关键词调试爬取，不写库
+│   ├── revalidate.py           # 历史快照重跑 LLM + 聚合
+│   ├── rerun_one_hardware.py   # 单硬件当日重跑
+│   ├── reset_backend_data.py   # 清空业务数据并重建硬件池（慎用）
+│   ├── cookies.json            # 闲鱼登录 Cookie（需手动填写）
+│   └── Debug_Manual.md        # 维护脚本手册
+├── frontend/
+│   └── src/
+│       ├── views/              # 落地页 / 主看板 / 详情 / 捡漏 / 提醒 / 管理 / 健康
+│       ├── components/         # HardwareCard / PriceTrendChart / MiniTrendSparkline
+│       ├── api/                # Axios 封装 + 类型定义
+│       └── styles/             # 三层主题（base / light / dark）
 ├── scripts/
-│   ├── dev-setup.sh             # 开发环境自举（Linux / macOS）
-│   ├── dev-setup.ps1            # 开发环境自举（Windows）
-│   └── legacy/setup.sh          # 旧 Ubuntu 全自动安装脚本（已弃用）
-└── .env.example
+│   ├── dev-setup.sh            # Linux/macOS 一键自举
+│   └── dev-setup.ps1           # Windows 一键自举
+├── .env                        # 实际配置（不入 git）
+└── .env.example                # 配置模板
 ```
 
-## 4. 本地开发环境（跨 Win / macOS / Linux）
+---
 
-### 4.1 准备
+## 数据库表结构
 
-请自行安装：
+| 表 | 说明 |
+|---|---|
+| `hardware_items` | 硬件池主表（id / name / category / search_keywords / is_active） |
+| `price_snapshots` | 爬取原始样本（price / title / item_url / is_valid / validation_reason …） |
+| `daily_stats` | 每日聚合行情（median / avg / min / max / sample_count / price_level） |
+| `price_alerts` | 价格提醒规则（scope / rule_type / threshold / channel / channel_target） |
+| `crawl_runs` | 爬虫运行记录（started_at / ended_at / status / success / failed） |
 
-- **Python 3.12+** ([下载](https://www.python.org/downloads/))
-- **Node.js 20+** ([下载](https://nodejs.org/))
-- **PostgreSQL 16+**
-  - Linux (Ubuntu/Debian)：`sudo apt-get install -y postgresql`
-  - macOS：`brew install postgresql@16 && brew services start postgresql@16`
-  - Windows：`winget install PostgreSQL.PostgreSQL` 或 [EDB 安装器](https://www.postgresql.org/download/windows/)
+---
 
-### 4.2 数据库准备（首次）
+## 快速开始
 
-启动 PostgreSQL 后，创建数据库与用户。账号密码与 `.env` 里的 `POSTGRES_USER` / `POSTGRES_PASSWORD` 保持一致即可。
+### 前置条件
 
-**Linux / macOS：**
+- Python 3.12+
+- Node.js 20+
+- pnpm（`npm install -g pnpm`）
+- PostgreSQL 16（需提前创建数据库和用户）
 
-```bash
-# 默认存在 postgres 超管角色
-sudo -u postgres psql <<'SQL'
-CREATE USER market WITH PASSWORD 'change-me';
+### 1. 创建数据库用户和库（首次）
+
+```sql
+-- 以 postgres 超级用户执行
+CREATE USER market WITH PASSWORD 'your-password';
 CREATE DATABASE market OWNER market;
-SQL
 ```
 
-macOS（brew 装的 PG，无 postgres 用户）：
-
-```bash
-psql postgres <<'SQL'
-CREATE USER market WITH PASSWORD 'change-me';
-CREATE DATABASE market OWNER market;
-SQL
-```
-
-**Windows：**
-
-```powershell
-# 使用安装时设的 postgres 密码
-psql -U postgres -h localhost -c "CREATE USER market WITH PASSWORD 'change-me';"
-psql -U postgres -h localhost -c "CREATE DATABASE market OWNER market;"
-```
-
-### 4.3 一键自举
+### 2. 配置环境变量
 
 ```bash
 cp .env.example .env
-# 编辑 .env：填好 DATABASE_URL 密码、LLM_BASE_URL / LLM_MODEL / LLM_API_KEY
 ```
 
-然后执行：
+编辑 `.env`，**必填项**：
 
-**Linux / macOS：**
+```env
+# 数据库（密码与上面 CREATE USER 保持一致）
+DATABASE_URL=postgresql+asyncpg://market:your-password@localhost:5432/market
+
+# LLM —— 三选一填一组即可
+# 本地 llama.cpp / LM Studio：
+LLM_BASE_URL=http://127.0.0.1:8082/v1
+LLM_MODEL=your-model-filename.gguf
+LLM_API_KEY=
+
+# OpenAI：
+# LLM_BASE_URL=https://api.openai.com/v1
+# LLM_MODEL=gpt-4o-mini
+# LLM_API_KEY=sk-xxxx
+
+# DeepSeek / 通义 / 智谱等 OpenAI 兼容 API 同理
+
+# 管理员 Token（硬件池增删改、手动触发爬取时用）
+ADMIN_TOKEN=dev-admin-token
+```
+
+**其他可选项**（均有合理默认值，不填也能启动）：
+
+```env
+CRAWLER_SCHEDULE=0 2 * * *   # 每天凌晨 2 点自动爬取
+FRONTEND_PORT=5173            # 前端端口，用于派生 CORS 白名单
+# CORS_ORIGINS=http://localhost:5173   # 手动指定 CORS 白名单（多个逗号分隔）
+# TELEGRAM_BOT_TOKEN=                 # 启用 Telegram 通知时填写
+```
+
+### 3. 安装依赖
 
 ```bash
-bash scripts/dev-setup.sh
+# 后端
+cd backend
+pip install -e .
+python -m playwright install firefox
+# Linux 还需要：
+sudo python -m playwright install-deps firefox
+
+# 前端
+cd ../frontend
+pnpm install
 ```
 
-**Windows（PowerShell）：**
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\dev-setup.ps1
-```
-
-脚本会：检测工具版本 → 装后端 pip 依赖 → 装 Playwright Firefox → 装前端 pnpm 依赖 → 跑 alembic 迁移。**不会**自动安装 Python / Node / PostgreSQL（只检测，缺则给提示）。
-
-### 4.4 启动开发服务
+### 4. 初始化数据库
 
 ```bash
-# 终端 1：后端
+cd backend
+alembic upgrade head
+```
+
+### 5. 填入闲鱼 Cookie
+
+将浏览器登录闲鱼（goofish.com）后的 Cookie 写入 `backend/cookies.json`。
+格式为 Playwright 标准 cookie 数组，可用浏览器扩展（如 EditThisCookie）导出。
+**不填 Cookie 爬虫仍可运行，但价格数据可能不完整。**
+
+### 6. 启动服务
+
+开两个终端：
+
+```bash
+# 终端 1 — 后端（http://localhost:8000）
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# 终端 2：前端
+# 终端 2 — 前端（http://localhost:5173）
 cd frontend
 pnpm dev
 ```
 
-访问：
-
-- 前端开发页：`http://localhost:5173`（Vite 自动代理 `/api` 到 8000）
-- Swagger：`http://localhost:8000/docs`
-- 健康检查：`http://localhost:8000/health`
-
-爬虫需要 `backend/cookies.json`（goofish 登录后用 Cookie-Editor 等扩展导出 JSON）。
-
-### 4.5 维护脚本
-
-```bash
-cd backend
-python rerun_one_hardware.py --hardware-name "RTX 4090" --pages 3
-python revalidate.py --hardware-name "RTX 4090" --date 2026-04-01 --limit 100
-python test_crawl.py "RTX 4090" --pages 1
-python reset_backend_data.py    # 慎用
-```
-
-## 5. 环境变量
-
-完整变量见 `.env.example`。要点：
-
-- `DATABASE_URL`：本地连接串
-- `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY`：OpenAI 兼容协议；本地 LLM 留空 api_key
-- `CRAWLER_SCHEDULE`：cron 表达式，默认每天 02:00
-- `FRONTEND_PORT`：用于派生 CORS 白名单，默认 5173（与 Vite 开发端口一致）
-- `CORS_ORIGINS`：留空时由 `FRONTEND_PORT` 自动派生
-- 通知扩展（Telegram、Webhook、SMTP）已在 `.env.example` 预留位，但本版本未实现
-
-## 6. 运行机制（数据流）
-
-1. 读取固定硬件池（`backend/app/core/hardware_pool.py`）
-2. 逐个硬件抓取闲鱼搜索结果
-3. 规则过滤后写入 `price_snapshots`
-4. 调用 LLM 标注 `is_valid`
-5. 对有效样本做离群值过滤与日聚合
-6. 写入 `daily_stats`
-7. 前端读取 `/api/hardware` 与 `/api/hardware/{id}/trend` 展示
-
-定时任务在后端启动时自动注册，见 `backend/app/scheduler/jobs.py`。
-
-## 7. 常用接口
-
-基址：`/api`
-
-- `GET /hardware`：按分类返回硬件及最新统计
-- `GET /hardware/{hardware_id}`：单硬件详情
-- `GET /hardware/{hardware_id}/trend?days=7|30|90`：趋势数据
-- `GET /crawler/status`：最近爬取状态
-- `POST /crawler/run`：手动触发全量爬取（后台任务）
-- `POST /validator/run?limit=100`：手动触发校验任务
-- `GET /validator/status`：校验进度
-
-## 8. 前端说明
-
-- 首页支持三种视图：热力矩阵、表格趋势、卡片
-- 详情页支持 7/30/90 天价格走势 + 估值/动量/波动/可信度分析
-- 开发期 Vite 自动把 `/api` 代理到 `http://localhost:8000`
-
-## 9. 常见问题
-
-### Q1：前端打不开数据，接口 404/CORS 报错？
-
-- 确认后端在 8000 端口运行；前端用 `pnpm dev`（5173）走 Vite proxy
-- 改了 `.env` 后需要重启 uvicorn
-
-### Q2：爬虫跑不出来数据？
-
-- 检查 `backend/cookies.json` 是否最新（goofish 登录态）
-- 查看 uvicorn 控制台日志，找 `Loaded N cookies`
-- 必要时给 uvicorn 进程设置 `HTTPS_PROXY` / `HTTP_PROXY`
-
-### Q3：LLM 校验一直失败？
-
-- 检查 `LLM_BASE_URL`（应以 `/v1` 结尾，代码会拼 `/chat/completions`）
-- 检查 `LLM_API_KEY`：本地服务可留空，云端服务必填
-
-### Q4：修改硬件池后为什么前端顺序不变/数据不一致？
-
-- 修改 `backend/app/core/hardware_pool.py` 后执行：
-  - `cd backend && python reset_backend_data.py`
-- 然后触发或等待下一次爬取
-
-## 10. 安全与注意事项
-
-- `.env`、`backend/cookies.json` 已在 `.gitignore`，不要提交
-- 建议 `chmod 600 .env backend/cookies.json`
-- `reset_backend_data.py` 会清空业务数据，请谨慎
-- 当前 `POST /crawler/run`、`POST /validator/run` 无鉴权，不要把后端暴露公网
+健康检查：`curl http://localhost:8000/health`
 
 ---
 
-详细后端说明：`backend/README.md`、`backend/Debug_Manual.md`。
+## API 接口
+
+基址 `http://localhost:8000`，在线文档：`http://localhost:8000/docs`
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/health` | 服务健康检查 |
+| GET | `/api/hardware` | 全部硬件 + 最新统计，按 category 分组 |
+| GET | `/api/hardware/admin` | 管理员视图（含 inactive）需要 `X-Admin-Token` |
+| GET | `/api/hardware/{id}` | 单硬件详情 + 最新统计 |
+| GET | `/api/hardware/{id}/trend?days=7\|30\|90` | 价格趋势 |
+| GET | `/api/hardware/{id}/samples?limit=8` | 精选原始样本 |
+| POST | `/api/hardware` | 新增硬件（需 `X-Admin-Token`） |
+| PATCH | `/api/hardware/{id}` | 编辑硬件（需 `X-Admin-Token`） |
+| DELETE | `/api/hardware/{id}` | 软删除（需 `X-Admin-Token`） |
+| POST | `/api/hardware/{id}/restore` | 恢复软删除（需 `X-Admin-Token`） |
+| POST | `/api/hardware/{id}/crawl` | 单硬件立即爬取（需 `X-Admin-Token`） |
+| GET | `/api/crawler/status` | 最近爬虫状态 |
+| POST | `/api/crawler/run` | 手动触发全量爬取 |
+| POST | `/api/crawler/pause` | 暂停当前爬取 |
+| GET | `/api/validator/status` | LLM 校验进度 |
+| POST | `/api/validator/run?limit=100` | 手动触发 LLM 校验 |
+| GET | `/api/deals/today?limit=20` | 今日捡漏列表 |
+| GET | `/api/alerts` | 价格提醒列表 |
+| POST | `/api/alerts` | 新增提醒规则 |
+| PATCH | `/api/alerts/{id}` | 更新提醒规则 |
+| DELETE | `/api/alerts/{id}` | 删除提醒规则 |
+| POST | `/api/alerts/{id}/test` | 测试通知发送 |
+| GET | `/api/health/crawler` | 采集健康详情 |
+
+需要鉴权的接口在请求头加 `X-Admin-Token: <ADMIN_TOKEN>`（默认 `dev-admin-token`）。
+
+---
+
+## 前端页面
+
+| 路由 | 页面 |
+|---|---|
+| `/` | 落地页（Spline 3D 场景） |
+| `/home` | 主看板：热力矩阵 + 表格 + 卡片 + 今日捡漏榜 |
+| `/hardware/:id` | 硬件详情：价格走势图 + 精选样本 |
+| `/deals` | 今日捡漏瀑布卡片 |
+| `/alerts` | 价格提醒管理 |
+| `/admin/hardware` | 硬件池订阅管理（增删改、手动爬取） |
+| `/health/crawler` | 采集健康状态 |
+
+---
+
+## 重建数据库
+
+**只清空业务数据，保留表结构（最常用）：**
+
+```bash
+cd backend
+python reset_backend_data.py
+```
+
+**彻底重建表结构：**
+
+```bash
+# 用 psql 删库重建
+psql "postgresql://market:your-password@localhost:5432/market" \
+  -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+cd backend
+alembic upgrade head
+python reset_backend_data.py
+```
+
+---
+
+## 维护脚本
+
+详细参数见 [backend/Debug_Manual.md](backend/Debug_Manual.md)。
+
+| 脚本 | 用途 |
+|---|---|
+| `test_crawl.py <keyword>` | 单关键词调试爬取，不写库 |
+| `revalidate.py` | 历史快照重跑 LLM 校验 + 聚合 |
+| `rerun_one_hardware.py --hardware-name <N>` | 单硬件当日重爬 + 清洗 + 聚合 |
+| `reset_backend_data.py` | 清空 price_snapshots / daily_stats 并重建硬件池（**慎用**） |
+
+---
+
+## 注意事项
+
+- 闲鱼已迁移至 `goofish.com`，爬虫目标 URL 已跟进
+- Playwright Firefox 首次安装需下载约 100 MB
+- Cookie 不填仍可运行，但部分商品价格可能不完整；遭遇强制登录拦截时必须填入
+- LLM 服务不可用时后端仍可启动，但 `is_valid` 字段将保持 `null`，聚合结果会偏差

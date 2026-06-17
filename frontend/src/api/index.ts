@@ -1,6 +1,8 @@
 import axios from 'axios'
 import type {
   AlertPayload,
+  ConfigData,
+  CookieStatus,
   CrawlerHealth,
   CrawlerRunResponse,
   HardwareDetail,
@@ -8,6 +10,7 @@ import type {
   DealItem,
   HardwareCreatePayload,
   HardwareUpdatePayload,
+  HwCrawlProgressResponse,
   PriceAlert,
   TrendResponse,
   CrawlerStatus,
@@ -69,6 +72,18 @@ export const hardwareApi = {
   crawl(token: string, id: number): Promise<void> {
     return http.post(`/hardware/${id}/crawl`, null, adminHeaders(token)).then()
   },
+
+  reset(token: string): Promise<{ status: string; inserted: number }> {
+    return http.post<{ status: string; inserted: number }>('/hardware/reset', null, adminHeaders(token)).then(r => r.data)
+  },
+
+  crawlNow(id: number): Promise<{ status: string; run_id?: number; message?: string }> {
+    return http.post<{ status: string; run_id?: number; message?: string }>(`/hardware/${id}/crawl-now`).then(r => r.data)
+  },
+
+  crawlProgress(id: number): Promise<HwCrawlProgressResponse> {
+    return http.get<HwCrawlProgressResponse>(`/hardware/${id}/crawl-progress`).then(r => r.data)
+  },
 }
 
 export const crawlerApi = {
@@ -121,5 +136,29 @@ export const alertsApi = {
 export const healthApi = {
   crawler(): Promise<CrawlerHealth> {
     return http.get<CrawlerHealth>('/health/crawler').then(r => r.data)
+  },
+}
+
+export const configApi = {
+  get(token: string): Promise<ConfigData> {
+    return http.get<ConfigData>('/config', adminHeaders(token)).then(r => r.data)
+  },
+  update(token: string, patch: Partial<ConfigData>): Promise<ConfigData> {
+    return http.patch<ConfigData>('/config', patch, adminHeaders(token)).then(r => r.data)
+  },
+  testLlm(token: string): Promise<{ ok: boolean; message: string; models?: string[] }> {
+    return http.post('/config/test-llm', {}, adminHeaders(token)).then(r => r.data)
+  },
+  testDb(token: string): Promise<{ ok: boolean; message: string }> {
+    return http.post('/config/test-db', {}, adminHeaders(token)).then(r => r.data)
+  },
+  getCookies(token: string): Promise<CookieStatus> {
+    return http.get<CookieStatus>('/config/cookies', adminHeaders(token)).then(r => r.data)
+  },
+  uploadCookies(token: string, content: string): Promise<CookieStatus> {
+    return http.post<CookieStatus>('/config/cookies', { content }, adminHeaders(token)).then(r => r.data)
+  },
+  deleteCookies(token: string): Promise<CookieStatus> {
+    return http.delete<CookieStatus>('/config/cookies', adminHeaders(token)).then(r => r.data)
   },
 }

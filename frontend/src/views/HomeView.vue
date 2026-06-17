@@ -3,8 +3,6 @@
     class="dashboard-shell"
     active-nav="home"
     main-class="main-area"
-    system-primary="后端实时已连接"
-    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
   >
     <template #header>
       <header class="ops-header">
@@ -49,13 +47,11 @@
               :percentage="visibleCrawlProgress.percent"
               :status="progressStatus"
               :stroke-width="12"
-              striped
-              striped-flow
             />
             <div class="progress-meta">
               <span>{{ visibleCrawlProgress.processed }} / {{ visibleCrawlProgress.total }} 个对象</span>
-              <span v-if="visibleCrawlProgress.phase === 'validating' && visibleCrawlProgress.validation_total">
-                已校验 {{ visibleCrawlProgress.validation_processed ?? 0 }} / {{ visibleCrawlProgress.validation_total }} 条 · 待校验 {{ visibleCrawlProgress.validation_pending ?? 0 }} 条
+              <span v-if="visibleCrawlProgress.llm_total > 0">
+                LLM 校验 {{ visibleCrawlProgress.llm_done }} / {{ visibleCrawlProgress.llm_total }}
               </span>
               <span v-else>成功 {{ crawlerHealth?.latest_run?.success ?? 0 }} · 失败 {{ crawlerHealth?.latest_run?.failed ?? 0 }} · 跳过 {{ crawlerHealth?.latest_run?.skipped ?? 0 }}</span>
             </div>
@@ -74,52 +70,52 @@
 
           <section class="dashboard-grid">
             <div class="primary-column">
-              <section class="focus-panel">
-                <div class="panel-head">
-                  <div>
-                    <h2>{{ focusItem?.name ?? '暂无关注对象' }}</h2>
-                    <p>
-                      当前订阅中样本最多的对象；搜索后会优先显示匹配结果里的最高样本项。
-                    </p>
+              <!-- 今日捡漏 + 大盘环图 -->
+              <section class="deals-panel">
+                <!-- 左：捡漏排行榜 -->
+                <div class="deals-col">
+                  <div class="deals-panel-head">
+                    <h3><el-icon><Aim /></el-icon>今日捡漏</h3>
+                    <button class="all-log-btn-sm" @click="goToDeals">全部 <el-icon><ArrowRight /></el-icon></button>
                   </div>
-                  <span class="fresh-pill">最近更新 {{ crawlerStatus?.last_run_date ?? '暂无' }}</span>
+                  <div v-if="isCrawlRunning" class="deals-panel-empty">
+                    <el-empty :image-size="40" description="采集中，稍后生成" />
+                  </div>
+                  <div v-else-if="dealRanking.length" class="deals-ranking">
+                    <a
+                      v-for="(deal, idx) in dealRanking"
+                      :key="`${deal.hardware_id}-${deal.item_url}`"
+                      class="rank-item"
+                      :href="deal.item_url || undefined"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span class="rank-no" :class="idx < 3 ? `top-${idx + 1}` : ''">{{ idx + 1 }}</span>
+                      <span class="rank-name">{{ deal.hardware_name }}</span>
+                      <strong class="rank-price">¥{{ formatPrice(deal.price) }}</strong>
+                      <em class="rank-badge">-{{ Math.round(deal.discount_rate * 100) }}%</em>
+                    </a>
+                  </div>
+                  <div v-else class="deals-panel-empty">
+                    <el-empty :image-size="40" description="暂无捡漏候选" />
+                  </div>
                 </div>
 
-                <div class="summary-cards" v-if="focusItem?.latest_stats">
-                  <article>
-                    <span>当前均价</span>
-                    <strong>¥{{ formatPrice(focusItem.latest_stats.avg_price) }}</strong>
-                    <small>样本 {{ focusItem.latest_stats.sample_count }} 条</small>
-                  </article>
-                  <article>
-                    <span>历史中位</span>
-                    <strong>¥{{ formatPrice(focusItem.latest_stats.median_price) }}</strong>
-                    <small>唯一商品 {{ focusItem.latest_stats.sample_count }} 个</small>
-                  </article>
-                  <article>
-                    <span>价格区间</span>
-                    <strong>¥{{ formatPrice(focusItem.latest_stats.min_price) }}</strong>
-                    <small>最高 ¥{{ formatPrice(focusItem.latest_stats.max_price) }}</small>
-                  </article>
-                </div>
-
-                <div class="curve-card">
-                  <div class="curve-head">
-                    <span>价格曲线</span>
-                    <div>
-                      <i class="dot avg"></i>均价
-                      <i class="dot mid"></i>中位数
+                <!-- 右：行情分布环图 -->
+                <div class="donut-col">
+                  <div class="deals-panel-head">
+                    <h3><el-icon><DataAnalysis /></el-icon>行情分布</h3>
+                  </div>
+                  <div class="donut-body">
+                    <v-chart class="donut-chart" :option="marketDonutOption" autoresize />
+                    <div class="donut-stats">
+                      <div v-for="s in marketStatusStats" :key="s.label" class="donut-stat-item">
+                        <i class="donut-dot" :style="{ background: s.color }"></i>
+                        <span>{{ s.label }}</span>
+                        <strong>{{ s.count }}</strong>
+                      </div>
                     </div>
                   </div>
-                  <MiniTrendSparkline
-                    v-if="focusItem"
-                    :points="trendCache[focusItem.id]?.median ?? []"
-                    :median-points="trendCache[focusItem.id]?.median ?? []"
-                    :avg-points="trendCache[focusItem.id]?.avg ?? []"
-                    :loading="Boolean(trendLoadingMap[focusItem.id])"
-                    :level="heatLevel(focusItem)"
-                    :height="112"
-                  />
                 </div>
               </section>
 
@@ -178,7 +174,7 @@
 
                 <template v-else-if="displayMode === 'table'">
                   <el-table :data="filteredHardware" class="market-table" stripe size="small">
-                    <el-table-column prop="name" label="对象" min-width="128" />
+                    <el-table-column prop="name" label="对象" min-width="70" />
                     <el-table-column label="中位价" width="92">
                       <template #default="{ row }">
                         <span v-if="row.latest_stats">¥{{ formatPrice(row.latest_stats.median_price) }}</span>
@@ -206,7 +202,7 @@
                         </span>
                       </template>
                     </el-table-column>
-                    <el-table-column label="趋势" width="132">
+                    <el-table-column label="趋势" width="210">
                       <template #default="{ row }">
                         <div class="compact-sparkline">
                           <MiniTrendSparkline
@@ -242,76 +238,30 @@
                 <el-empty v-if="!filteredHardware.length" description="暂无匹配数据" />
               </section>
             </div>
-
-            <aside class="activity-panel">
-              <div class="activity-head">
-                <h3><el-icon><Pulse /></el-icon>今日捡漏</h3>
-              </div>
-
-              <div v-if="isCrawlRunning" class="activity-empty">
-                <el-empty :image-size="72" description="本轮采集中，完成后生成今日捡漏" />
-              </div>
-
-              <template v-else>
-                <div class="deals-box">
-                  <div class="deals-head">
-                    <span>今日捡漏榜</span>
-                    <strong>{{ dealItems.length }}</strong>
-                  </div>
-                  <div class="deals-list" v-if="dealItems.length">
-                    <a
-                      v-for="deal in dealItems.slice(0, 5)"
-                      :key="`${deal.hardware_id}-${deal.item_url}-${deal.title}`"
-                      class="deal-item"
-                      :href="deal.item_url || undefined"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>{{ deal.hardware_name }}</span>
-                      <strong>¥{{ formatPrice(deal.price) }}</strong>
-                      <em>-{{ Math.round(deal.discount_rate * 100) }}%</em>
-                    </a>
-                  </div>
-                  <el-empty v-else :image-size="54" description="暂无捡漏候选" />
-                </div>
-
-                <div class="activity-list">
-                  <button
-                    v-for="item in activityItems"
-                    :key="`activity-${item.id}`"
-                    class="activity-item"
-                    @click="goToDetail(item.id)"
-                  >
-                    <i></i>
-                    <div>
-                      <strong>{{ item.name }}</strong>
-                      <span>{{ item.latest_stats?.stat_date ?? '暂无更新' }}</span>
-                      <small v-if="item.latest_stats">当前 ¥{{ formatPrice(item.latest_stats.median_price) }}</small>
-                      <small v-else>等待下一次调度执行</small>
-                    </div>
-                    <em>{{ item.latest_stats ? '已更新' : '待补充' }}</em>
-                  </button>
-                </div>
-              </template>
-
-              <button class="all-log-btn" @click="goToDeals">
-                查看全部捡漏 <el-icon><ArrowRight /></el-icon>
-              </button>
-            </aside>
           </section>
         </template>
   </OpsLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import VChart from 'vue-echarts'
+import { use } from 'echarts/core'
+import { PieChart } from 'echarts/charts'
+import { TooltipComponent, LegendComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { hardwareApi, crawlerApi, dealsApi, healthApi } from '@/api'
 import type { HardwareDetail, CrawlerStatus, DealItem, CrawlerHealth } from '@/api/types'
 import HardwareCard from '@/components/HardwareCard.vue'
 import MiniTrendSparkline from '@/components/MiniTrendSparkline.vue'
 import OpsLayout from '@/components/OpsLayout.vue'
+
+use(CanvasRenderer)
+use(PieChart)
+use(TooltipComponent)
+use(LegendComponent)
 
 type ViewMode = 'heatmap' | 'table' | 'cards'
 type HeatLevel = 'low' | 'normal' | 'high' | 'none'
@@ -367,9 +317,15 @@ const visibleCrawlProgress = computed(() => {
     processed: 0,
     total: activeHardwareCount.value || totalHardware.value || 0,
     current_hardware: null,
-    validation_total: 0,
-    validation_processed: 0,
-    validation_pending: 0,
+    crawl_percent: 0,
+    crawl_done: 0,
+    crawl_total: 0,
+    llm_percent: 0,
+    llm_done: 0,
+    llm_total: 0,
+    llm_current_hardware: null,
+    llm_current_done: null,
+    llm_current_total: null,
   }
 })
 
@@ -455,22 +411,60 @@ const overviewMetrics = computed(() => [
   },
 ])
 
-const sampleRanking = computed(() => {
-  return [...hardwareWithStats.value]
-    .sort((a, b) => (b.latest_stats?.sample_count ?? 0) - (a.latest_stats?.sample_count ?? 0))
-    .slice(0, 8)
+// 按折扣力度从大到小排列（最容易捡漏的排前面）
+const dealRanking = computed(() => {
+  return [...dealItems.value]
+    .sort((a, b) => b.discount_rate - a.discount_rate)
 })
 
-const priceRanking = computed(() => {
-  return [...hardwareWithStats.value]
-    .sort((a, b) => (b.latest_stats?.median_price ?? 0) - (a.latest_stats?.median_price ?? 0))
-    .slice(0, 8)
+type StatEntry = { label: string; color: string; count: number; value: string }
+
+const marketStatusStats = computed<StatEntry[]>(() => {
+  const counts = { low: 0, normal: 0, high: 0, none: 0 }
+  for (const item of allHardware.value) {
+    const level = item.latest_stats?.price_level ?? 'none'
+    counts[level as keyof typeof counts]++
+  }
+  return [
+    { label: '低位', color: 'rgb(59,130,246)',    count: counts.low,    value: 'low' },
+    { label: '正常', color: 'rgb(229,179,25)',    count: counts.normal, value: 'normal' },
+    { label: '偏高', color: 'rgb(221,102,71)',    count: counts.high,   value: 'high' },
+    { label: '无数据', color: 'rgba(0,0,0,0.15)', count: counts.none,   value: 'none' },
+  ]
 })
 
-const activityItems = computed(() => {
-  const missing = allHardware.value.filter((item) => !item.latest_stats).slice(0, 3)
-  return [...sampleRanking.value.slice(0, 5), ...missing].slice(0, 8)
+const marketDonutOption = computed(() => {
+  const stats = marketStatusStats.value
+  const total = stats.reduce((sum, s) => sum + s.count, 0)
+  return {
+    tooltip: {
+      trigger: 'item',
+      formatter: (p: { name: string; value: number; percent: number }) =>
+        `${p.name}: ${p.value} 个 (${p.percent}%)`,
+    },
+    legend: { show: false },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '78%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        label: { show: false },
+        emphasis: {
+          scale: true,
+          scaleSize: 6,
+          label: { show: false },
+        },
+        data: total === 0
+          ? [{ value: 1, name: '暂无数据', itemStyle: { color: 'rgba(0,0,0,0.08)' } }]
+          : stats
+              .filter(s => s.count > 0)
+              .map(s => ({ value: s.count, name: s.label, itemStyle: { color: s.color } })),
+      },
+    ],
+  }
 })
+
 
 const focusItem = computed(() => {
   const sortedFiltered = [...filteredHardware.value]
@@ -498,6 +492,13 @@ watch(focusItem, (item) => {
   }
 })
 
+watch(isCrawlRunning, (isRunning, wasRunning) => {
+  if (!isRunning && wasRunning) {
+    // Crawl just finished — do a final full reload so metrics update immediately
+    void loadDashboardData(true)
+  }
+})
+
 watch(
   () => route.query.view,
   (nextView) => {
@@ -520,8 +521,25 @@ watch(displayMode, (nextView) => {
   })
 })
 
+const SCROLL_KEY = 'home-scroll-top'
+
+onBeforeRouteLeave((to) => {
+  if (to.name === 'hardware-detail') {
+    const container = document.querySelector('.ops-workspace')
+    if (container) sessionStorage.setItem(SCROLL_KEY, String((container as HTMLElement).scrollTop))
+  }
+})
+
 onMounted(async () => {
   await loadDashboardData()
+  const saved = sessionStorage.getItem(SCROLL_KEY)
+  if (saved) {
+    sessionStorage.removeItem(SCROLL_KEY)
+    void nextTick(() => {
+      const container = document.querySelector('.ops-workspace')
+      if (container) (container as HTMLElement).scrollTop = Number(saved)
+    })
+  }
   progressTimer = window.setInterval(() => {
     void refreshCrawlerHealth().then(() => {
       if (isCrawlRunning.value) {
@@ -887,8 +905,9 @@ function goToDeals() {
 }
 
 .progress-head strong {
-  color: var(--text-strong);
-  font-size: 26px;
+  color: var(--el-color-primary);
+  font-size: 20px;
+  font-weight: 800;
 }
 
 .progress-meta {
@@ -896,6 +915,13 @@ function goToDeals() {
   justify-content: space-between;
   gap: 12px;
   margin-top: 10px;
+  color: #7b8798;
+}
+
+.crawl-progress-panel :deep(.el-progress__text) {
+  font-size: 11px !important;
+  font-weight: 800;
+  color: var(--el-color-primary) !important;
 }
 
 .metric-grid {
@@ -971,7 +997,7 @@ function goToDeals() {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 30px;
   align-items: start;
 }
@@ -1383,58 +1409,190 @@ function goToDeals() {
   gap: 14px;
 }
 
-.activity-panel {
-  padding: 22px;
+.deals-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 340px;
 }
 
-.activity-head h3 {
+.deals-col {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  border-right: 1px solid var(--paper-border);
+  min-height: 0;
+}
+
+.donut-col {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  min-height: 0;
+}
+
+.deals-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.deals-panel-head h3 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
+  font-size: 15px;
+  font-weight: 900;
+  margin: 0;
+  color: var(--text-strong);
 }
 
-.activity-list {
-  margin-top: 22px;
+.deals-ranking {
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
-.deals-box {
-  margin-top: 16px;
-  padding: 12px;
+.rank-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: var(--radius-control);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s;
 }
 
-.activity-empty {
-  min-height: 420px;
-  margin-top: 16px;
+.rank-item:hover {
+  background: var(--surface-soft-hover);
+}
+
+.rank-no {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--paper-border-strong);
+  color: var(--paper-muted);
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rank-no.top-1 { background: #f59e0b; color: #fff; }
+.rank-no.top-2 { background: #94a3b8; color: #fff; }
+.rank-no.top-3 { background: #b45309; color: #fff; }
+
+.rank-name {
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper-text);
+}
+
+.rank-price {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.rank-badge {
+  min-width: 40px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.donut-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 0;
+}
+
+.donut-chart {
+  flex: 0 0 auto;
+  width: 180px;
+  height: 180px;
+}
+
+.donut-stats {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+}
+
+.donut-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.donut-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.donut-stat-item span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--paper-muted);
+  min-width: 32px;
+}
+
+.donut-stat-item strong {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text-strong);
+}
+
+.deals-panel-empty {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.deals-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.deals-head span {
+.all-log-btn-sm {
+  border: 0;
+  background: transparent;
   color: var(--paper-muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 0;
 }
 
-.deals-head strong {
-  color: var(--text-success);
-  font-size: 18px;
-}
-
-.deals-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.all-log-btn-sm:hover {
+  color: var(--accent-primary);
 }
 
 .deal-item {

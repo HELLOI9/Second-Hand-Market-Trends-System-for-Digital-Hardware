@@ -94,13 +94,13 @@
   --tag-pill-radius: 999px;
   --tag-pill-weight: 500;
 
-  --dashboard-metric-card-blue: rgba(235, 122, 83, 0.6);
-  --dashboard-metric-card-green: rgba(247, 212, 76, 0.6);
-  --dashboard-metric-card-amber: rgba(235, 122, 83, 0.6);
-  --dashboard-metric-card-purple: rgba(247, 212, 76, 0.6);
-  --dashboard-metric-text: #593324;
-  --dashboard-metric-muted: rgba(89, 51, 36, 0.78);
-  --dashboard-metric-icon: rgba(89, 51, 36, 0.82);
+  --dashboard-metric-card-blue: var(--surface-floating);
+  --dashboard-metric-card-green: var(--surface-floating);
+  --dashboard-metric-card-amber: var(--surface-floating);
+  --dashboard-metric-card-purple: var(--surface-floating);
+  --dashboard-metric-text: var(--accent-primary);
+  --dashboard-metric-muted: var(--paper-muted);
+  --dashboard-metric-icon: var(--accent-primary);
 
   --detail-hero-panel-bg:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);

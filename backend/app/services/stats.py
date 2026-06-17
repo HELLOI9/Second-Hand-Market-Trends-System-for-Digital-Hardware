@@ -11,10 +11,12 @@
 
 import logging
 import re
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
+from app.core.timezone import now_cst
 
 import numpy as np
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -306,7 +308,7 @@ async def save_snapshots(
             seller=item.seller,
             image_url=item.image_url,
             publish_time=item.publish_time,
-            crawled_at=datetime.utcnow(),
+            crawled_at=now_cst(),
         )
         if not settings.llm_validation_enabled:
             snapshot.is_valid = True
@@ -329,9 +331,9 @@ async def compute_daily_stats(
     对指定硬件在 stat_date 当天的 price_snapshots 做统计聚合，写入 daily_stats。
     若当天无数据则返回 None。
     """
-    # 拉取当天价格样本
-    result = await db.execute(
-        select(PriceSnapshot.price).where(
+    # 找到当天最晚一次爬取的批次时间（精确到分钟，同一批次 crawled_at 相差不超过 5 分钟）
+    latest_ts_result = await db.execute(
+        select(func.max(PriceSnapshot.crawled_at)).where(
             and_(
                 PriceSnapshot.hardware_id == hardware.id,
                 PriceSnapshot.snapshot_date == stat_date,
@@ -339,7 +341,25 @@ async def compute_daily_stats(
             )
         )
     )
-    prices = [row.price for row in result]
+    latest_ts = latest_ts_result.scalar_one_or_none()
+
+    # 拉取当天最晚批次的价格样本（同批次 crawled_at 在 latest_ts 前 5 分钟内）
+    if latest_ts is not None:
+        from datetime import timedelta as _td
+        batch_start = latest_ts - _td(minutes=5)
+        result = await db.execute(
+            select(PriceSnapshot.price).where(
+                and_(
+                    PriceSnapshot.hardware_id == hardware.id,
+                    PriceSnapshot.snapshot_date == stat_date,
+                    PriceSnapshot.is_valid == True,
+                    PriceSnapshot.crawled_at >= batch_start,
+                )
+            )
+        )
+        prices = [row.price for row in result]
+    else:
+        prices = []
 
     if not prices:
         await _delete_stale_daily_stats(db, hardware, stat_date)

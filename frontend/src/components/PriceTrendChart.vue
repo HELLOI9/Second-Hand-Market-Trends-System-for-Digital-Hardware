@@ -241,18 +241,17 @@ const chartOption = computed(() => {
 
 <style scoped>
 .trend-chart-wrap {
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .single-day-note {
-  position: absolute;
-  top: 2px;
-  left: 7%;
-  z-index: 1;
+  display: inline-block;
+  margin-bottom: 10px;
   border-radius: 999px;
   background: var(--chart-note-bg);
   color: var(--paper-muted);
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   font-weight: 700;
 }

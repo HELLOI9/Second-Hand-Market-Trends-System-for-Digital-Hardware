@@ -1,4 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+from app.core.timezone import now_cst
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +56,7 @@ async def evaluate_alerts_after_crawl(db: AsyncSession, hardware: HardwareItem, 
         await db.execute(select(PriceAlert).where(PriceAlert.is_active == True))
     ).scalars().all()
     fired = 0
-    now = datetime.utcnow()
+    now = now_cst()
     for alert in alerts:
         if not _alert_applies(alert, hardware):
             continue

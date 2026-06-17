@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from app.core.timezone import now_cst, today_cst
 import asyncio
 import logging
 import threading
@@ -96,6 +96,15 @@ async def trigger_crawl(db: DbDep, force: bool = Query(False)):
             },
         )
 
+    # 检查是否有单硬件采集正在运行
+    from app.api.hardware import _hw_crawl_lock, _hw_crawls
+    with _hw_crawl_lock:
+        if any(v for v in _hw_crawls.values()):
+            return CrawlerRunResponse(
+                status="running",
+                summary={"message": "请等待当前采集完毕后再开始新一轮监测", "force": force},
+            )
+
     with _crawl_lock:
         if _crawl_running:
             return CrawlerRunResponse(status="running", summary={"message": "已有采集任务正在运行", "force": force})
@@ -122,7 +131,7 @@ async def pause_crawl(db: DbDep):
         return CrawlerRunResponse(status="idle", summary={"message": "当前没有正在运行的采集任务"})
 
     active_run.status = "interrupted"
-    active_run.ended_at = datetime.utcnow()
+    active_run.ended_at = now_cst()
     await db.commit()
     return CrawlerRunResponse(
         status="paused",

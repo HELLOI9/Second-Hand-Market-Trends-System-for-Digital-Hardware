@@ -24,7 +24,7 @@
 - `/admin/hardware`：订阅管理 `HardwarePoolAdminView.vue`
 - `/health/crawler`：采集健康 `CrawlerHealthView.vue`
 
-路由定义位于 [src/router/index.ts](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/router/index.ts)。
+路由定义位于 [src/router/index.ts](src/router/index.ts)。
 
 ## 三、项目结构
 
@@ -65,7 +65,7 @@ frontend/
 
 ## 四、主题样式职责
 
-主题入口在 [src/main.ts](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/main.ts)，按顺序加载：
+主题入口在 [src/main.ts](src/main.ts)，按顺序加载：
 
 ```ts
 import './styles/theme-base.css'
@@ -87,19 +87,19 @@ import './styles/theme-dark.css'
 
 ## 五、布局与页面职责
 
-- [src/components/OpsLayout.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/components/OpsLayout.vue)
+- [src/components/OpsLayout.vue](src/components/OpsLayout.vue)
   - 统一侧边栏、顶栏、主题切换、系统状态区
   - `HomeView`、`DealsView`、`AlertsView`、`HardwarePoolAdminView`、`CrawlerHealthView` 复用该布局
-- [src/views/HomeView.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/views/HomeView.vue)
+- [src/views/HomeView.vue](src/views/HomeView.vue)
   - 首页总览
   - 包含热力矩阵、表格趋势、卡片视图，以及右侧今日捡漏榜
-- [src/views/HardwareDetailView.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/views/HardwareDetailView.vue)
+- [src/views/HardwareDetailView.vue](src/views/HardwareDetailView.vue)
   - 单硬件详情、分析卡片、价格走势图、精选样本
-- [src/views/DealsView.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/views/DealsView.vue)
+- [src/views/DealsView.vue](src/views/DealsView.vue)
   - 今日捡漏商品瀑布卡片
-- [src/views/CrawlerHealthView.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/views/CrawlerHealthView.vue)
+- [src/views/CrawlerHealthView.vue](src/views/CrawlerHealthView.vue)
   - 采集健康状态、最近运行、健康预警
-- [src/views/LandingPage.vue](/D:/ProgramDatas/Codex/Second-Hand-Market-Trends-System-for-Digital-Hardware/frontend/src/views/LandingPage.vue)
+- [src/views/LandingPage.vue](src/views/LandingPage.vue)
   - 落地页，当前通过 `vue3-spline` 加载 Spline 场景
 
 ## 七、开发说明

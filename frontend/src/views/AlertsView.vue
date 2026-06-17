@@ -1,8 +1,6 @@
 <template>
   <OpsLayout
     active-nav="alerts"
-    system-primary="后端实时已连接"
-    :system-secondary="crawlerStatus?.last_run_date ? `更新于 ${crawlerStatus.last_run_date}` : '等待首次更新'"
   >
     <template #header>
       <header class="ops-header">

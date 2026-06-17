@@ -24,31 +24,46 @@ CONCURRENCY = 5
 
 VALIDATION_PROMPT = """/no_think
 
-你是一个二手硬件商品筛选助手。判断以下商品标题是否是有效的"{hardware_name}"商品。
+你是一个二手商品筛选助手。判断以下商品标题是否是有效的"{hardware_name}"商品。
 
-注意：{hardware_name}是真实存在的商品，不存在虚构问题，请严格按照以下标准判断：
+注意："{hardware_name}"是真实存在的商品，不存在虚构问题，请严格按照以下标准判断：
 
 无效商品包括：
-1. 笔记本整机（我们只要独立显卡/CPU/内存/SSD，不要整机）
-2. 故障品、不确定好坏、坏的、维修的
-3. 配件、转接线、支架、散热器、硬盘盒等周边产品（不含硬件本体）
-4. 明显是其他型号的硬件，或者是什么“拓展卡”“转接卡”之类容易混淆视听的东西
-5. 标题与硬件名称完全不相关
-6. 细微的硬件型号差别，比如"R9 9950X"和"R9 9950X3D"不是同一款CPU
-7. 单根的内存条
+1. 故障品、不确定好坏、坏的、仅供维修或拆件的
+2. 配件、周边、赠品、包装盒、票据等非商品本体的东西
+3. 明显是其他型号/款式/规格的商品，或容易混淆视听的相似品
+4. 标题与目标商品完全不相关
+5. 细微但关键的型号或规格差别（例如带后缀、不同版本、不同容量/尺寸视为不同商品）
 
 有效商品：
-1. 独立的显卡/CPU/SSD硬盘/成套的内存条（套条）
-2. 二手、拆机、全新都算有效
-3. 标题明确提到目标型号
-4. 魔改的、非常规的也算有效（比如涡轮卡），只要标题里有目标型号且没有明显不相关的词
+1. 标题明确指向目标商品本体
+2. 二手、全新、拆机/拆封都算有效
+3. 非常规、改装、定制版本也算有效，只要标题指向目标商品且没有明显不相关的词
 
+如果信息不足以判断，倾向于判定为无效。
+{extra_rule}
 只返回 JSON，不要其他内容：
 {{"valid": true或false, "reason": "判断理由（20字以内）"}}
 
 现在我给出商品描述：{title}
 
 """
+
+EXTRA_RULE_TEMPLATE = """
+针对"{hardware_name}"的特别筛选规则（优先级最高，与上述规则冲突时以此为准）：
+{rule}
+"""
+
+
+def _render_prompt(title: str, hardware_name: str, rule: str | None) -> str:
+    extra_rule = ""
+    if rule and rule.strip():
+        extra_rule = EXTRA_RULE_TEMPLATE.format(hardware_name=hardware_name, rule=rule.strip())
+    return VALIDATION_PROMPT.format(
+        hardware_name=hardware_name,
+        title=title,
+        extra_rule=extra_rule,
+    )
 
 
 def _chat_completions_url() -> str:
@@ -121,10 +136,11 @@ async def _call_llm(
     title: str,
     hardware_name: str,
     *,
+    rule: str | None = None,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[bool | None, str]:
     """Call LLM via OpenAI-compatible API to validate a single item title. Returns (is_valid, reason)."""
-    prompt = VALIDATION_PROMPT.format(hardware_name=hardware_name, title=title)
+    prompt = _render_prompt(title, hardware_name, rule)
     url = _llm_url()
     request_payload = _request_payload(prompt)
     headers = {"Content-Type": "application/json"}
@@ -229,7 +245,7 @@ async def _call_llm(
 
 async def _validate_rows(
     db: AsyncSession,
-    rows: list[tuple[PriceSnapshot, str]],
+    rows: list[tuple[PriceSnapshot, str, str | None]],
     *,
     commit: bool = True,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
@@ -245,12 +261,13 @@ async def _validate_rows(
     summary = {"validated": 0, "valid": 0, "invalid": 0, "failed": 0}
 
     async with httpx.AsyncClient() as client:
-        async def validate_one(snapshot: PriceSnapshot, hw_name: str):
+        async def validate_one(snapshot: PriceSnapshot, hw_name: str, rule: str | None):
             async with semaphore:
                 is_valid, reason = await _call_llm(
                     client,
                     snapshot.title,
                     hw_name,
+                    rule=rule,
                     debug_hook=debug_hook,
                 )
 
@@ -266,7 +283,7 @@ async def _validate_rows(
                 else:
                     summary["failed"] += 1
 
-        tasks = [validate_one(snapshot, hw_name) for snapshot, hw_name in rows]
+        tasks = [validate_one(snapshot, hw_name, rule) for snapshot, hw_name, rule in rows]
         await asyncio.gather(*tasks)
 
     if commit:
@@ -284,6 +301,7 @@ async def validate_snapshot_record(
     snapshot: PriceSnapshot,
     hardware_name: str,
     *,
+    rule: str | None = None,
     commit: bool = True,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
@@ -293,6 +311,7 @@ async def validate_snapshot_record(
             client,
             snapshot.title,
             hardware_name,
+            rule=rule,
             debug_hook=debug_hook,
         )
 
@@ -317,21 +336,23 @@ async def validate_snapshot_record(
 
 async def validate_snapshot_rows_sequential(
     db: AsyncSession,
-    rows: list[tuple[PriceSnapshot, str]],
+    rows: list[tuple[PriceSnapshot, str, str | None]],
     *,
     commit_each: bool = True,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
     should_stop: Callable[[], bool] | None = None,
+    on_progress: Callable[[int, int], Any] | None = None,  # (done, total)
 ) -> dict[str, Any]:
     """Validate snapshot rows one by one in order."""
     summary = {"validated": 0, "valid": 0, "invalid": 0, "failed": 0}
+    total = len(rows)
 
     if not rows:
         logger.info("No snapshots selected for sequential validation")
         return summary
 
     async with httpx.AsyncClient() as client:
-        for snapshot, hardware_name in rows:
+        for snapshot, hardware_name, rule in rows:
             if should_stop is not None and should_stop():
                 logger.info("Sequential validation interrupted by stop request")
                 break
@@ -340,6 +361,7 @@ async def validate_snapshot_rows_sequential(
                 client,
                 snapshot.title,
                 hardware_name,
+                rule=rule,
                 debug_hook=debug_hook,
             )
 
@@ -357,6 +379,10 @@ async def validate_snapshot_rows_sequential(
             if commit_each:
                 await db.commit()
 
+            if on_progress is not None:
+                done = summary["validated"] + summary["failed"]
+                await on_progress(done, total)
+
     if not commit_each:
         await db.commit()
 
@@ -372,9 +398,9 @@ async def validate_batch(db: AsyncSession, limit: int = 100) -> dict[str, Any]:
     Validate unvalidated price_snapshots (is_valid=NULL) using Ollama.
     Returns summary dict.
     """
-    # Fetch unvalidated snapshots with their hardware name
+    # Fetch unvalidated snapshots with their hardware name and rule
     result = await db.execute(
-        select(PriceSnapshot, HardwareItem.name)
+        select(PriceSnapshot, HardwareItem.name, HardwareItem.validation_rule)
         .join(HardwareItem, PriceSnapshot.hardware_id == HardwareItem.id)
         .where(PriceSnapshot.is_valid.is_(None))
         .limit(limit)

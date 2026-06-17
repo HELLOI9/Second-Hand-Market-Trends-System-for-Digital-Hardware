@@ -1,9 +1,12 @@
 from datetime import date, datetime
+
+from app.core.timezone import now_cst
 from sqlalchemy import String, Text, Boolean, ForeignKey, Date, DateTime, Float, Integer, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
 from app.core.database import Base
+from app.core.timezone import now_cst
 
 
 class PriceLevel(str, enum.Enum):
@@ -30,7 +33,7 @@ class PriceSnapshot(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     publish_time: Mapped[datetime | None] = mapped_column(DateTime)
     crawled_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
+        DateTime, nullable=False, default=now_cst
     )
 
     # LLM validation fields

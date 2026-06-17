@@ -10,12 +10,22 @@
         <div class="title-wrap">
           <h2 class="title">{{ hardware?.name ?? '加载中…' }}</h2>
           <p class="subtitle" v-if="hardware?.latest_stats">
-            最近数据：{{ hardware.latest_stats.stat_date }} · {{ hardware.latest_stats.sample_count }} 个样本
+            <template v-if="hardware.stats_is_stale">
+              <span class="stale-warning">
+                ⚠ 旧数据：{{ hardware.latest_stats.stat_date }}（本轮采集无样本，非当天数据）
+              </span>
+            </template>
+            <template v-else>
+              最近数据：{{ hardware.latest_stats.stat_date }} · {{ hardware.latest_stats.sample_count }} 个样本
+            </template>
           </p>
         </div>
 
         <el-button v-if="hardware" class="alert-btn" :icon="Bell" @click="subscribeHardware">
           订阅提醒
+        </el-button>
+        <el-button v-if="hardware" type="primary" :loading="hwCrawling" @click="startCrawl">
+          立即采集
         </el-button>
       </div>
     </header>
@@ -23,8 +33,12 @@
     <main class="content" v-if="hardware">
       <section class="stats-row" v-if="hardware.latest_stats">
         <el-card class="stat-card">
-          <div class="stat-label">今日中位价</div>
+          <div class="stat-label">最新中位价</div>
           <div class="stat-value emphasize">¥{{ formatPrice(hardware.latest_stats.median_price) }}</div>
+          <div class="stat-date" :class="{ stale: hardware.stats_is_stale }">
+            <template v-if="hardware.stats_is_stale">⚠ 旧数据 · 截至 {{ hardware.latest_stats.stat_date }}</template>
+            <template v-else>截至 {{ hardware.latest_stats.stat_date }}</template>
+          </div>
         </el-card>
 
         <el-card class="stat-card">
@@ -37,7 +51,7 @@
         </el-card>
 
         <el-card class="stat-card">
-          <div class="stat-label">今日样本数</div>
+          <div class="stat-label">样本数</div>
           <div class="stat-value">{{ hardware.latest_stats.sample_count }} 件</div>
         </el-card>
 
@@ -47,6 +61,40 @@
             <el-tag :type="levelTagType(hardware.latest_stats.price_level)" round>
               {{ LEVEL_LABELS[hardware.latest_stats.price_level] }}
             </el-tag>
+          </div>
+        </el-card>
+      </section>
+
+      <!-- 采集进度 -->
+      <section v-if="hwCrawling || hwProgress" class="crawl-progress-section">
+        <el-card class="crawl-progress-card">
+          <div class="progress-row">
+            <span class="progress-label">爬取进度</span>
+            <el-progress
+              :percentage="hwProgress?.crawl_percent ?? 0"
+              :stroke-width="14"
+              color="#6366f1"
+            />
+            <span class="progress-pct">
+              <template v-if="hwProgress && hwProgress.crawl_total > 0">
+                {{ hwProgress.crawl_done }} / {{ hwProgress.crawl_total }}
+              </template>
+              <template v-else>等待中</template>
+            </span>
+          </div>
+          <div class="progress-row">
+            <span class="progress-label">LLM 校验</span>
+            <el-progress
+              :percentage="hwProgress?.llm_current_total ? Math.round((hwProgress.llm_current_done ?? 0) / hwProgress.llm_current_total * 100) : 0"
+              :stroke-width="14"
+              color="#10b981"
+            />
+            <span class="progress-pct">
+              <template v-if="hwProgress?.llm_current_total">
+                {{ hwProgress.llm_current_done ?? 0 }} / {{ hwProgress.llm_current_total }}
+              </template>
+              <template v-else>等待中</template>
+            </span>
           </div>
         </el-card>
       </section>
@@ -234,9 +282,8 @@
           <article
             v-for="item in recommendedSamples"
             :key="item.id"
-            class="recommend-card"
-            :class="{ clickable: Boolean(item.item_url) }"
-            @click="item.item_url && openItem(item.item_url)"
+            class="recommend-card clickable"
+            @click="openDrawer(item)"
           >
             <div class="item-image">
               <img v-if="item.image_url" :src="item.image_url" :alt="item.title" loading="lazy" />
@@ -259,31 +306,82 @@
                 <div class="match-track">
                   <i :style="{ width: `${recommendInfo(item).score}%` }"></i>
                 </div>
-                <p>{{ recommendInfo(item).reason }}</p>
-              </div>
-
-              <div class="price-meta">
-                <div>
-                  <span>市场中位</span>
-                  <strong>¥{{ formatPrice(hardware.latest_stats?.median_price ?? item.price) }}</strong>
-                </div>
-                <div>
-                  <span>样本日期</span>
-                  <strong>{{ item.snapshot_date }}</strong>
-                </div>
               </div>
             </div>
 
             <footer class="recommend-footer">
               <span>{{ item.seller || '未知卖家' }}</span>
-              <el-button v-if="item.item_url" text @click.stop="openItem(item.item_url)">详情</el-button>
-              <span v-else>无链接</span>
             </footer>
           </article>
         </div>
 
         <el-empty v-else description="暂无精选相关商品" />
       </section>
+
+      <!-- Sample detail drawer -->
+      <el-drawer
+        v-model="drawerVisible"
+        direction="rtl"
+        size="400px"
+        :with-header="false"
+        class="sample-drawer"
+      >
+        <template v-if="drawerItem">
+          <div class="drawer-topbar">
+            <div class="drawer-topbar-left">
+              <span v-if="drawerInfo.featured" class="featured-badge">精选</span>
+              <span v-else class="drawer-kicker">参考样本</span>
+            </div>
+            <button class="drawer-close-btn" aria-label="关闭" @click="drawerVisible = false">
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
+
+          <div class="drawer-hero">
+            <img v-if="drawerItem.image_url" :src="drawerItem.image_url" :alt="drawerItem.title" />
+            <div v-else class="drawer-hero-placeholder">{{ hardware?.name.slice(0, 2) }}</div>
+          </div>
+
+          <div class="drawer-body">
+            <h3 class="drawer-title">{{ drawerItem.title }}</h3>
+
+            <div class="drawer-meta-row">
+              <strong class="drawer-price">¥{{ formatPrice(drawerItem.price) }}</strong>
+              <span class="drawer-area-tag">{{ drawerItem.area || '暂无地区' }}</span>
+            </div>
+
+            <div v-if="drawerItem.seller" class="drawer-seller-row">
+              <el-icon><User /></el-icon>
+              <span>{{ drawerItem.seller }}</span>
+            </div>
+
+            <div class="drawer-divider"></div>
+
+            <div class="drawer-analysis" :class="{ caution: !drawerInfo.recommended }">
+              <div class="drawer-analysis-header">
+                <span class="drawer-analysis-label">{{ drawerInfo.recommended ? '推荐关注' : '谨慎观察' }}</span>
+                <strong class="drawer-score-text">匹配度 {{ drawerInfo.score }}%</strong>
+              </div>
+              <div class="drawer-track">
+                <i :style="{ width: `${drawerInfo.score}%` }"></i>
+              </div>
+              <p class="drawer-reason">{{ drawerInfo.reason }}</p>
+            </div>
+          </div>
+
+          <div class="drawer-footer">
+            <el-button
+              v-if="drawerItem.item_url"
+              type="primary"
+              size="large"
+              class="drawer-cta"
+              @click="openItem(drawerItem.item_url!)"
+            >
+              去闲鱼查看
+            </el-button>
+          </div>
+        </template>
+      </el-drawer>
     </main>
 
     <div v-else-if="!loading" class="not-found">
@@ -297,12 +395,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Bell } from '@element-plus/icons-vue'
+import { Bell, Close, User } from '@element-plus/icons-vue'
 import { hardwareApi } from '@/api'
-import type { HardwareDetail, TrendResponse, PriceLevel, TrendPoint, HardwareSample } from '@/api/types'
+import type { HardwareDetail, TrendResponse, PriceLevel, TrendPoint, HardwareSample, HwCrawlProgressResponse } from '@/api/types'
 import PriceTrendChart from '@/components/PriceTrendChart.vue'
 
 const props = defineProps<{ id: string }>()
@@ -325,6 +423,86 @@ const analysisTrend = ref<TrendResponse | null>(null)
 const samples = ref<HardwareSample[]>([])
 const selectedDays = ref<7 | 30 | 90>(30)
 const sampleLoading = ref(false)
+const drawerVisible = ref(false)
+const drawerItem = ref<HardwareSample | null>(null)
+
+// ── 单硬件立即采集 ──────────────────────────────
+const hwCrawling = ref(false)
+const hwProgress = ref<HwCrawlProgressResponse['progress']>(null)
+let crawlPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function startCrawl() {
+  if (hwCrawling.value) return
+  hwCrawling.value = true
+  hwProgress.value = null
+  try {
+    const res = await hardwareApi.crawlNow(Number(props.id))
+    if (res.status === 'already_running' || res.status === 'started') {
+      startPolling()
+    } else if (res.status === 'rejected') {
+      ElMessage.warning(res.message || '请等待当前采集完毕后再进行下一次采集')
+      hwCrawling.value = false
+    } else {
+      hwCrawling.value = false
+    }
+  } catch {
+    ElMessage.error('触发采集失败')
+    hwCrawling.value = false
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  crawlPollTimer = setInterval(async () => {
+    try {
+      const res = await hardwareApi.crawlProgress(Number(props.id))
+      hwProgress.value = res.progress
+      if (!res.running) {
+        stopPolling()
+        hwCrawling.value = false
+        hwProgress.value = null
+        // 根据实际状态提示
+        if (res.progress?.phase === 'success') {
+          ElMessage.success('采集完成')
+        } else if (res.progress?.phase === 'failed') {
+          ElMessage.error('采集失败，请检查日志')
+        } else {
+          ElMessage.warning('采集已结束')
+        }
+        // 刷新数据
+        const [detail] = await Promise.all([
+          hardwareApi.detail(Number(props.id)),
+          loadTrend(),
+          loadAnalysisTrend(),
+          loadSamples(),
+        ])
+        hardware.value = detail
+      }
+    } catch {
+      // 忽略单次轮询失败
+    }
+  }, 2000)
+}
+
+function stopPolling() {
+  if (crawlPollTimer) {
+    clearInterval(crawlPollTimer)
+    crawlPollTimer = null
+  }
+}
+
+onUnmounted(() => {
+  stopPolling()
+})
+
+const drawerInfo = computed(() =>
+  drawerItem.value ? recommendInfo(drawerItem.value) : { score: 0, reason: '', recommended: false, featured: false },
+)
+
+function openDrawer(item: HardwareSample) {
+  drawerItem.value = item
+  drawerVisible.value = true
+}
 
 type SignalLevel = 'low' | 'normal' | 'high'
 
@@ -613,9 +791,14 @@ const sampleBarData = computed(() => {
 })
 
 const recommendedSamples = computed(() => {
-  return [...samples.value]
-    .sort((a, b) => recommendInfo(b).score - recommendInfo(a).score)
-    .slice(0, 8)
+  const sorted = [...samples.value].sort((a, b) => {
+    const infoA = recommendInfo(a)
+    const infoB = recommendInfo(b)
+    // featured first, then by score descending
+    if (infoA.featured !== infoB.featured) return infoA.featured ? -1 : 1
+    return infoB.score - infoA.score
+  })
+  return sorted
 })
 
 function recommendInfo(item: HardwareSample): { score: number; reason: string; recommended: boolean; featured: boolean } {
@@ -702,7 +885,7 @@ async function loadAnalysisTrend() {
 async function loadSamples() {
   sampleLoading.value = true
   try {
-    samples.value = await hardwareApi.samples(Number(props.id), 8)
+    samples.value = await hardwareApi.samples(Number(props.id), 24)
   } catch {
     samples.value = []
   } finally {
@@ -727,6 +910,18 @@ onMounted(async () => {
     ElMessage.error('加载对象信息失败')
   } finally {
     loading.value = false
+  }
+
+  // 恢复进度条：检查该硬件是否有正在进行的采集
+  try {
+    const progressRes = await hardwareApi.crawlProgress(Number(props.id))
+    if (progressRes.running) {
+      hwCrawling.value = true
+      hwProgress.value = progressRes.progress
+      startPolling()
+    }
+  } catch {
+    // 忽略
   }
 })
 </script>
@@ -794,6 +989,11 @@ onMounted(async () => {
   color: var(--detail-hero-muted);
 }
 
+.stale-warning {
+  color: #e11d48;
+  font-weight: 700;
+}
+
 .content {
   max-width: 1200px;
   margin: 18px auto 0;
@@ -806,6 +1006,67 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
+}
+
+.crawl-progress-section {
+  margin-top: 2px;
+}
+
+.crawl-progress-card {
+  border: 1px solid var(--detail-card-border);
+  background: var(--detail-panel-bg);
+  box-shadow: var(--detail-panel-shadow);
+}
+
+.crawl-progress-card :deep(.el-card__body) {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-label {
+  flex-shrink: 0;
+  width: 68px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--paper-text);
+}
+
+.progress-row :deep(.el-progress) {
+  flex: 1;
+}
+
+.progress-pct {
+  flex-shrink: 0;
+  min-width: 72px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--paper-muted);
+}
+
+.progress-row :deep(.el-progress__text) {
+  font-size: 11px !important;
+  font-weight: 800;
+  color: var(--el-color-primary) !important;
+}
+
+.crawl-btn {
+  border-color: var(--detail-hero-button-border);
+  background: var(--detail-hero-button-bg);
+  color: var(--detail-hero-text);
+}
+
+.crawl-btn:hover {
+  background: var(--detail-hero-button-bg-hover);
+  color: var(--detail-hero-text);
 }
 
 .analysis-overview {
@@ -1046,6 +1307,17 @@ onMounted(async () => {
   color: var(--text-strong);
 }
 
+.stat-date {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--paper-subtle);
+}
+
+.stat-date.stale {
+  color: #e11d48;
+  font-weight: 700;
+}
+
 .sep {
   color: var(--paper-subtle);
   margin: 0 4px;
@@ -1281,36 +1553,6 @@ onMounted(async () => {
   -webkit-line-clamp: 2;
 }
 
-.price-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.price-meta div {
-  min-width: 0;
-  padding: 10px;
-}
-
-.price-meta span {
-  display: block;
-  color: var(--paper-subtle);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.price-meta strong {
-  display: block;
-  margin-top: 5px;
-  overflow: hidden;
-  color: var(--text-strong);
-  font-size: 13px;
-  font-weight: 950;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .recommend-footer {
   display: flex;
   align-items: center;
@@ -1333,6 +1575,228 @@ onMounted(async () => {
 .recommend-footer :deep(.el-button) {
   color: var(--text-strong);
   font-weight: 950;
+}
+
+.sample-drawer :deep(.el-drawer) {
+  background: var(--detail-panel-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.sample-drawer :deep(.el-drawer__body) {
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.drawer-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--paper-border);
+  flex-shrink: 0;
+}
+
+.drawer-kicker {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--paper-subtle);
+}
+
+.drawer-close-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-ghost-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--paper-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+}
+
+.drawer-close-btn:hover {
+  background: var(--control-ghost-bg-hover);
+  color: var(--paper-text);
+  border-color: var(--control-ghost-border-hover);
+}
+
+.drawer-hero {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.drawer-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.drawer-hero-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+  font-weight: 950;
+  color: var(--paper-muted);
+  background: linear-gradient(135deg, rgba(16, 27, 49, 0.06), rgba(22, 132, 95, 0.10)), var(--surface-sunken);
+}
+
+.drawer-hero .featured-badge {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text-strong);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.drawer-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.drawer-price {
+  color: var(--text-danger);
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.drawer-area-tag {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  border: 1px solid var(--paper-border);
+  color: var(--paper-subtle);
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+}
+
+.drawer-seller-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--paper-muted);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.drawer-divider {
+  height: 1px;
+  background: var(--paper-border);
+  margin-bottom: 18px;
+}
+
+.drawer-analysis {
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: rgba(72, 160, 120, 0.07);
+  border: 1px solid rgba(72, 160, 120, 0.18);
+}
+
+.drawer-analysis.caution {
+  background: rgba(217, 68, 93, 0.07);
+  border-color: rgba(217, 68, 93, 0.18);
+}
+
+.drawer-analysis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.drawer-analysis-label {
+  font-size: 13px;
+  font-weight: 950;
+  color: var(--badge-success-text);
+}
+
+.drawer-analysis.caution .drawer-analysis-label {
+  color: var(--badge-danger-text);
+}
+
+.drawer-score-text {
+  font-size: 13px;
+  font-weight: 950;
+  color: var(--paper-text);
+}
+
+.drawer-track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.drawer-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text-success);
+  transition: width 0.4s ease;
+}
+
+.drawer-analysis.caution .drawer-track i {
+  background: var(--text-danger);
+}
+
+.drawer-reason {
+  margin-top: 12px;
+  color: var(--paper-muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.75;
+}
+
+.drawer-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 20px;
+  background: var(--detail-panel-bg);
+  border-top: 1px solid var(--paper-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.drawer-cta {
+  width: 100%;
 }
 
 .not-found {

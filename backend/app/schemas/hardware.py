@@ -20,8 +20,13 @@ class HardwareDetail(BaseModel):
     name: str
     category: str
     search_keywords: list[str] = []
+    validation_rule: str | None = None
     is_active: bool = True
     latest_stats: DailyStatsOut | None = None
+    # 全站最近一轮采集日期（锚点）。详情页用它判断 latest_stats 是否为当轮数据。
+    latest_run_date: date | None = None
+    # latest_stats 是否早于全站锚点日（即不是本轮数据，属于历史回退）
+    stats_is_stale: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -30,6 +35,7 @@ class HardwareCreate(BaseModel):
     name: str
     category: str
     search_keywords: list[str] = []
+    validation_rule: str | None = None
     cold_start: bool = True
 
 
@@ -37,6 +43,7 @@ class HardwareUpdate(BaseModel):
     name: str | None = None
     category: str | None = None
     search_keywords: list[str] | None = None
+    validation_rule: str | None = None
     is_active: bool | None = None
 
 
