@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     llm_validation_enabled: bool = True
     admin_token: str = "dev-admin-token"
     telegram_bot_token: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
     frontend_port: int = 8080
     cors_origins: str = ""
 

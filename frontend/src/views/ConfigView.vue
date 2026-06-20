@@ -337,6 +337,12 @@ async function deleteCookies() {
 const LLM_FIELDS: (keyof ConfigData)[] = ['llm_base_url', 'llm_model', 'llm_api_key', 'llm_validation_enabled']
 const DB_FIELDS: (keyof ConfigData)[] = ['postgres_host', 'postgres_port', 'postgres_user', 'postgres_password', 'postgres_db']
 
+function normalizeApiKey(value: string): string {
+  const trimmed = value.trim()
+  const exportMatch = trimmed.match(/^(?:export\s+)?(?:ARK_API_KEY|LLM_API_KEY)=['"]?([^'"\s]+)['"]?$/)
+  return exportMatch?.[1] ?? trimmed
+}
+
 async function runLlmTest() {
   llmTest.status = 'testing'
   llmTest.message = ''
@@ -378,6 +384,11 @@ const form = reactive<ConfigData>({
   postgres_db: 'market',
   postgres_host: 'localhost',
   postgres_port: 5432,
+  smtp_host: '',
+  smtp_port: 465,
+  smtp_user: '',
+  smtp_password: '',
+  smtp_from: '',
   database_url_preview: '',
 })
 
@@ -397,6 +408,9 @@ async function load() {
 
 async function save() {
   if (!original.value) return
+  form.llm_base_url = form.llm_base_url.trim()
+  form.llm_model = form.llm_model.trim()
+  form.llm_api_key = normalizeApiKey(form.llm_api_key)
   const patch: Partial<ConfigData> = {}
   const readonlyKeys: (keyof ConfigData)[] = ['admin_token_hint', 'database_url_preview']
   const keys = (Object.keys(form) as (keyof ConfigData)[]).filter(k => !readonlyKeys.includes(k))
@@ -455,7 +469,8 @@ void load()
 }
 
 .cfg-panel-head-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 0.9fr);
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -464,14 +479,20 @@ void load()
 .cfg-test-area {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  flex-shrink: 0;
+  min-width: 0;
   padding-top: 2px;
 }
 
 .cfg-test-msg {
+  min-width: 0;
+  max-width: 100%;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .cfg-test-msg.ok {
@@ -586,6 +607,19 @@ void load()
 }
 
 @media (max-width: 720px) {
+  .cfg-panel-head-row {
+    grid-template-columns: 1fr;
+  }
+
+  .cfg-test-area {
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .cfg-test-msg {
+    text-align: left;
+  }
+
   .cfg-grid {
     grid-template-columns: 1fr;
     padding: 16px;

@@ -185,7 +185,10 @@ const filteredItems = computed(() => {
     return `${item.name} ${item.search_keywords.join(' ')}`.toLowerCase().includes(text)
   })
     : items.value
-  return [...source].sort((a, b) => a.id - b.id)
+  return [...source].sort((a, b) => {
+    if (a.is_active !== b.is_active) return a.is_active ? -1 : 1
+    return a.id - b.id
+  })
 })
 
 // ── 全选 / 批量 ────────────────────────────────
@@ -477,7 +480,7 @@ function formatPrice(price: number): string {
 .subscription-head,
 .subscription-row {
   display: grid;
-  grid-template-columns: 40px minmax(200px, 1.2fr) minmax(200px, 1fr) minmax(160px, 0.8fr) minmax(180px, auto);
+  grid-template-columns: 40px minmax(200px, 1.2fr) minmax(200px, 1fr) minmax(160px, 0.8fr) 220px;
   gap: 18px;
   align-items: center;
 }
@@ -495,6 +498,13 @@ function formatPrice(price: number): string {
   color: var(--paper-muted);
   font-size: 12px;
   font-weight: 900;
+}
+
+.subscription-head span:last-child {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
 }
 
 .subscription-row {
@@ -585,11 +595,12 @@ function formatPrice(price: number): string {
 }
 
 .action-cell {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 40px 32px 32px;
+  justify-content: center;
   gap: 12px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .action-cell :deep(.el-button) {
@@ -664,8 +675,7 @@ function formatPrice(price: number): string {
 
   .subscription-row .action-cell {
     grid-column: 2;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 </style>

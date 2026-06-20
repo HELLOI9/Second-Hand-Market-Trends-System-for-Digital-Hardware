@@ -384,7 +384,31 @@
       </el-drawer>
     </main>
 
-    <div v-else-if="!loading" class="not-found">
+    <el-dialog
+      v-model="alertDialogVisible"
+      title="创建新提醒"
+      width="620px"
+      class="detail-alert-dialog"
+      modal-class="detail-alert-overlay"
+      transition=""
+    >
+      <el-form label-position="top" class="detail-alert-form">
+        <el-form-item label="商品">
+          <el-input :model-value="hardware?.name ?? ''" disabled />
+        </el-form-item>
+        <el-form-item label="价格阈值">
+          <el-input v-model="alertMinPriceText" inputmode="decimal" :placeholder="alertPricePlaceholder" />
+        </el-form-item>
+        <el-form-item label="邮箱地址">
+          <el-input v-model="alertTarget" placeholder="收件邮箱，例如 name@example.com" />
+        </el-form-item>
+        <div class="detail-alert-actions">
+          <el-button type="primary" :loading="alertSaving" @click="createDetailAlert">创建提醒</el-button>
+        </div>
+      </el-form>
+    </el-dialog>
+
+    <div v-if="!loading && !hardware" class="not-found">
       <el-result icon="warning" title="对象不存在" sub-title="请返回首页重新选择">
         <template #extra>
           <el-button @click="goBack">返回首页</el-button>
@@ -399,8 +423,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Bell, Close, User } from '@element-plus/icons-vue'
-import { hardwareApi } from '@/api'
-import type { HardwareDetail, TrendResponse, PriceLevel, TrendPoint, HardwareSample, HwCrawlProgressResponse } from '@/api/types'
+import { alertsApi, hardwareApi } from '@/api'
+import type { AlertPayload, HardwareDetail, TrendResponse, PriceLevel, TrendPoint, HardwareSample, HwCrawlProgressResponse } from '@/api/types'
 import PriceTrendChart from '@/components/PriceTrendChart.vue'
 
 const props = defineProps<{ id: string }>()
@@ -425,6 +449,15 @@ const selectedDays = ref<7 | 30 | 90>(30)
 const sampleLoading = ref(false)
 const drawerVisible = ref(false)
 const drawerItem = ref<HardwareSample | null>(null)
+const alertDialogVisible = ref(false)
+const alertSaving = ref(false)
+const alertTarget = ref(localStorage.getItem('hardware-alert-target') ?? '')
+const alertMinPriceText = ref('')
+
+const alertPricePlaceholder = computed(() => {
+  const median = hardware.value?.latest_stats?.median_price
+  return median ? `中位价 ¥${formatPrice(median)}` : '中位价'
+})
 
 // ── 单硬件立即采集 ──────────────────────────────
 const hwCrawling = ref(false)
@@ -560,8 +593,53 @@ function subscribeHardware() {
     name: 'alerts',
     query: {
       hardwareId: props.id,
+      mode: 'create',
     },
   })
+}
+
+function validateAlertTarget(target: string): string | null {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target) ? null : '请填写有效邮箱地址'
+}
+
+async function createDetailAlert() {
+  if (!hardware.value) return
+  const target = alertTarget.value.trim()
+  if (!target) {
+    ElMessage.warning('先填写推送地址')
+    return
+  }
+  const targetError = validateAlertTarget(target)
+  if (targetError) {
+    ElMessage.warning(targetError)
+    return
+  }
+  const threshold = Number(alertMinPriceText.value)
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    ElMessage.warning('请填写价格阈值')
+    return
+  }
+
+  alertSaving.value = true
+  try {
+    await alertsApi.create({
+      scope_type: 'hardware',
+      scope_value: String(hardware.value.id),
+      rule_type: 'below_price',
+      threshold,
+      channel: 'email',
+      channel_target: target,
+      cooldown_hours: 24,
+      is_active: true,
+    })
+    localStorage.setItem('hardware-alert-target', target)
+    ElMessage.success('已创建提醒')
+    alertDialogVisible.value = false
+  } catch {
+    ElMessage.error('创建失败')
+  } finally {
+    alertSaving.value = false
+  }
 }
 
 function levelTagType(level: PriceLevel) {
@@ -1804,6 +1882,26 @@ onMounted(async () => {
   margin: 80px auto 0;
 }
 
+.detail-alert-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.detail-alert-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.detail-alert-form :deep(.el-select),
+.detail-alert-form :deep(.el-input) {
+  width: 100%;
+}
+
+.detail-alert-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
   .detail-page {
     padding: 14px;
@@ -1835,5 +1933,22 @@ onMounted(async () => {
   .recommend-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+</style>
+
+<style>
+.detail-alert-dialog {
+  background: #ffffff;
+  opacity: 1 !important;
+}
+
+.detail-alert-overlay {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.detail-alert-overlay .el-dialog,
+.detail-alert-overlay .el-dialog__body,
+.detail-alert-overlay .el-form {
+  opacity: 1 !important;
 }
 </style>

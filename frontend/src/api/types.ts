@@ -109,7 +109,7 @@ export interface DealItem {
 
 export type AlertScopeType = 'hardware' | 'all'
 export type AlertRuleType = 'below_price' | 'below_median_pct' | 'level_low'
-export type AlertChannel = 'webhook' | 'telegram'
+export type AlertChannel = 'email' | 'sms'
 
 export interface PriceAlert {
   id: number
@@ -172,6 +172,11 @@ export interface ConfigData {
   postgres_db: string
   postgres_host: string
   postgres_port: number
+  smtp_host: string
+  smtp_port: number
+  smtp_user: string
+  smtp_password: string
+  smtp_from: string
   database_url_preview: string
 }
 

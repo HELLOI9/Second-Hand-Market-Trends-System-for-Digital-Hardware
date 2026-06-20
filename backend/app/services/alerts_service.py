@@ -22,7 +22,7 @@ def _alert_applies(alert: PriceAlert, hardware: HardwareItem) -> bool:
 
 def _rule_matches(alert: PriceAlert, stats: DailyStats, history_median: float | None) -> bool:
     if alert.rule_type == "below_price":
-        return alert.threshold is not None and stats.median_price <= alert.threshold
+        return alert.threshold is not None and stats.min_price < alert.threshold
     if alert.rule_type == "below_median_pct":
         if alert.threshold is None or not history_median:
             return False
@@ -66,7 +66,8 @@ async def evaluate_alerts_after_crawl(db: AsyncSession, hardware: HardwareItem, 
             continue
         message = (
             f"价格提醒命中：{hardware.name}\n"
-            f"中位价 ¥{stats.median_price:.0f}，样本 {stats.sample_count} 条，状态 {stats.price_level.value}"
+            f"今日最低价 ¥{stats.min_price:.0f}，已低于你设置的价格阈值 ¥{alert.threshold:.0f}。\n"
+            f"今日中位价 ¥{stats.median_price:.0f}，样本 {stats.sample_count} 条。"
         )
         if await send_notification(alert.channel, alert.channel_target, message):
             alert.last_fired_at = now
