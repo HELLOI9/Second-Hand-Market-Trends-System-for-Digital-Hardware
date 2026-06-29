@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-market}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-market}
+      POSTGRES_DB: ${POSTGRES_DB:-market}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-market} -d ${POSTGRES_DB:-market}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 覆盖 .env 中的 DATABASE_URL：容器网络内 host 必须是服务名 db
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-market}:${POSTGRES_PASSWORD:-market}@db:5432/${POSTGRES_DB:-market}
+      # 固定 DB host/port：即便用户在前端「详细设置」改动数据库字段，重建的 URL 仍指向 db 容器
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    volumes:
+      - ./:/workspace   # 挂载整个仓库：持久化根目录 .env 与 backend/cookies.json，且支持热重载
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      # Vite dev server 的 /api 代理目标：容器网络内指向 backend 服务
+      VITE_API_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app                  # 挂载前端源码，支持热更新
+      - frontend_node_modules:/app/node_modules  # named volume 隔离依赖，避免被宿主覆盖
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  frontend_node_modules:

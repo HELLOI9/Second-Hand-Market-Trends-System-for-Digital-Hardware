@@ -26,26 +26,57 @@ VALIDATION_PROMPT = """/no_think
 
 你是一个二手商品筛选助手。判断以下商品标题是否是有效的"{hardware_name}"商品。
 
+**当前商品标价 {price} 元**
+
 注意："{hardware_name}"是真实存在的商品，不存在虚构问题，请严格按照以下标准判断：
 
-无效商品包括：
-1. 故障品、不确定好坏、坏的、仅供维修或拆件的
-2. 配件、周边、赠品、包装盒、票据等非商品本体的东西
-3. 明显是其他型号/款式/规格的商品，或容易混淆视听的相似品
-4. 标题与目标商品完全不相关
-5. 细微但关键的型号或规格差别（例如带后缀、不同版本、不同容量/尺寸视为不同商品）
+## 硬性排除规则（优先级最高，满足任一条即判定为无效）：
 
-有效商品：
-1. 标题明确指向目标商品本体
-2. 二手、全新、拆机/拆封都算有效
-3. 非常规、改装、定制版本也算有效，只要标题指向目标商品且没有明显不相关的词
+1. **标题包含以下关键词之一，立即判定为无效**：
+   - 包装、盒子、空盒、原盒、包装盒、显卡包装盒
+   - 服务、教程、代、帮、降压、超频、分核、装机、BIOS
+   - 支架、散热器、风扇、外壳、背板、贴膜、配件
+   - 料板、拆件、故障、坏的、维修
 
-如果信息不足以判断，倾向于判定为无效。
+2. **极端低价自动排除**（价格远低于市场常识时，必须特别严格）：
+   - 高端 CPU（i9/R9/9000系列）低于 500 元 → 大概率是服务/包装
+   - 高端显卡（RTX 4080/4090/5070/5080/5090/RX 7900/9000系列）低于 1000 元 → 大概率是包装/配件
+   - 1TB+ SSD 低于 150 元 → 大概率是包装/拆件
+
+   **当价格触发以上阈值时，除非标题明确包含"全新未拆"/"二手正常使用"等可信描述，否则判定为无效。**
+
+3. **容量/规格不匹配**：
+   - 目标商品包含容量（如 2TB），但标题列出的容量不包含目标值（如只写128G/256G/512G/1T）→ 无效
+
+## 有效商品必须同时满足：
+
+1. 标题明确指向目标商品**本体**（不是包装、不是服务、不是配件）
+2. 没有触发上述硬性排除规则
+3. 二手、全新、拆机/拆封都算有效（但拆件/料板不算）
+
+## 判断流程：
+
+**第一步：硬性排除检查**
+- 扫描标题是否包含"包装"/"盒子"/"服务"/"配件"等排除词
+- 如果包含，立即判 valid=false，无需继续分析
+
+**第二步：极端低价警报**
+- 如果价格触发上述阈值，严格审查标题
+- 标题必须有"全新未拆"/"二手正常"等明确可信描述才算有效
+- 标题含糊不清时，判 valid=false
+
+**第三步：容量/规格核对**
+- 对于有容量/规格要求的商品（SSD/内存等），检查标题列出的规格是否包含目标值
+- 不包含则判 valid=false
+
 {extra_rule}
+
 只返回 JSON，不要其他内容：
 {{"valid": true或false, "reason": "判断理由（20字以内）"}}
 
-现在我给出商品描述：{title}
+现在我给出商品描述：
+标题：{title}
+价格：{price} 元
 
 """
 
@@ -55,13 +86,14 @@ EXTRA_RULE_TEMPLATE = """
 """
 
 
-def _render_prompt(title: str, hardware_name: str, rule: str | None) -> str:
+def _render_prompt(title: str, hardware_name: str, price: float, rule: str | None) -> str:
     extra_rule = ""
     if rule and rule.strip():
         extra_rule = EXTRA_RULE_TEMPLATE.format(hardware_name=hardware_name, rule=rule.strip())
     return VALIDATION_PROMPT.format(
         hardware_name=hardware_name,
         title=title,
+        price=price,
         extra_rule=extra_rule,
     )
 
@@ -135,12 +167,13 @@ async def _call_llm(
     client: httpx.AsyncClient,
     title: str,
     hardware_name: str,
+    price: float,
     *,
     rule: str | None = None,
     debug_hook: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[bool | None, str]:
     """Call LLM via OpenAI-compatible API to validate a single item title. Returns (is_valid, reason)."""
-    prompt = _render_prompt(title, hardware_name, rule)
+    prompt = _render_prompt(title, hardware_name, price, rule)
     url = _llm_url()
     request_payload = _request_payload(prompt)
     headers = {"Content-Type": "application/json"}
@@ -267,6 +300,7 @@ async def _validate_rows(
                     client,
                     snapshot.title,
                     hw_name,
+                    snapshot.price,
                     rule=rule,
                     debug_hook=debug_hook,
                 )
@@ -311,6 +345,7 @@ async def validate_snapshot_record(
             client,
             snapshot.title,
             hardware_name,
+            snapshot.price,
             rule=rule,
             debug_hook=debug_hook,
         )
@@ -361,6 +396,7 @@ async def validate_snapshot_rows_sequential(
                 client,
                 snapshot.title,
                 hardware_name,
+                snapshot.price,
                 rule=rule,
                 debug_hook=debug_hook,
             )

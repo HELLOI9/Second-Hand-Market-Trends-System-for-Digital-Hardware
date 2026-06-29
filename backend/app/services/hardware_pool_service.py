@@ -50,7 +50,7 @@ async def run_single_hardware_crawl(
                 PriceSnapshot.snapshot_date == today,
                 PriceSnapshot.is_valid.is_(None),
             )
-            .order_by(PriceSnapshot.id)
+            .order_by(PriceSnapshot.price.desc())  # 按价格从高到低，优先验证真实商品
             .limit(validation_limit)
         )
     ).all()
@@ -62,7 +62,7 @@ async def run_single_hardware_crawl(
                 PriceSnapshot.snapshot_date == today,
                 PriceSnapshot.is_valid.is_(None),
             )
-            .order_by(PriceSnapshot.id)
+            .order_by(PriceSnapshot.price.desc())  # 保持相同排序
             .offset(validation_limit)
         )
     ).scalars().all()

@@ -20,7 +20,7 @@ from app.services.llm_validator import validate_snapshot_rows_sequential
 from app.services.stats import save_snapshots, compute_daily_stats
 
 logger = logging.getLogger(__name__)
-VALIDATION_LIMIT_PER_HARDWARE = 25
+VALIDATION_LIMIT_PER_HARDWARE = 100  # 提高到100条，覆盖更多样本
 
 
 async def run_full_crawl(
@@ -153,7 +153,7 @@ async def run_full_crawl(
                     PriceSnapshot.hardware_id == hw.id,
                     PriceSnapshot.is_valid.is_(None),
                 )
-                .order_by(PriceSnapshot.id)
+                .order_by(PriceSnapshot.price.desc())  # 按价格从高到低，优先验证真实商品
             )
             all_rows = validation_result.all()
             validation_rows = []
@@ -315,7 +315,7 @@ async def run_single_hw_tracked(
                     PriceSnapshot.hardware_id == hardware.id,
                     PriceSnapshot.is_valid.is_(None),
                 )
-                .order_by(PriceSnapshot.id)
+                .order_by(PriceSnapshot.price.desc())  # 按价格从高到低，优先验证真实商品
             )
         ).all()
 

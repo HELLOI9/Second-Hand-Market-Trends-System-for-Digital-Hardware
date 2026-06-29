@@ -25,20 +25,24 @@
 
 ```text
 backend/
+├── Dockerfile               # Docker 镜像定义（Python 3.12 + uv + Playwright）
+├── docker-entrypoint.sh     # 容器入口脚本（迁移 + 启动）
+├── .dockerignore
 ├── app/
-│   ├── api/              # 路由：hardware / crawler / validator / deals / alerts / health / config
-│   ├── core/            # config / database / auth / timezone / hardware_pool
-│   ├── crawler/         # 闲鱼爬虫（xianyu.py）
-│   ├── models/          # SQLAlchemy 模型（hardware / price / alert）
-│   ├── scheduler/       # APScheduler 定时任务
-│   ├── schemas/         # Pydantic 输出模型
-│   ├── services/        # 爬取 / 清洗聚合 / LLM / 捡漏 / 健康 / 通知
-│   └── main.py          # FastAPI 入口
-├── alembic/             # 数据库迁移（0001 → 0008）
-├── test_crawl.py        # 单关键词抓取调试（不写库）
-├── revalidate.py        # 历史快照重跑 LLM + 聚合
-├── rerun_one_hardware.py# 单硬件当日重跑
-├── reset_backend_data.py# 清空业务数据并按硬件池重建
+│   ├── api/                 # 路由：hardware / crawler / validator / deals / alerts / health / config
+│   ├── core/                # config / database / auth / timezone / hardware_pool
+│   ├── crawler/             # 闲鱼爬虫（xianyu.py）
+│   ├── models/              # SQLAlchemy 模型（hardware / price / alert）
+│   ├── scheduler/           # APScheduler 定时任务
+│   ├── schemas/             # Pydantic 输出模型
+│   ├── services/            # 爬取 / 清洗聚合 / LLM / 捡漏 / 健康 / 通知
+│   └── main.py              # FastAPI 入口
+├── alembic/                 # 数据库迁移（0001 → 0008）
+├── test_crawl.py            # 单关键词抓取调试（不写库）
+├── revalidate.py            # 历史快照重跑 LLM + 聚合
+├── rerun_one_hardware.py    # 单硬件当日重跑
+├── reset_backend_data.py    # 清空业务数据并按硬件池重建
+├── cookies.json             # 闲鱼登录 Cookie（需手动填写，不入 git）
 ├── Debug_Manual.md
 └── README.md
 ```
@@ -143,10 +147,16 @@ FRONTEND_PORT=5173
 查看实际生效值：
 
 ```bash
+# 本地开发
 uv run python -c "from app.core.config import settings; print(settings.database_url, settings.llm_base_url, settings.llm_model)"
+
+# Docker
+docker compose exec backend python -c "from app.core.config import settings; print(settings.database_url)"
 ```
 
 ## 7. 启动
+
+### 本地开发
 
 首次：
 
@@ -154,6 +164,8 @@ uv run python -c "from app.core.config import settings; print(settings.database_
 cd backend
 uv sync                       # 或 pip install -e .
 uv run playwright install firefox
+# Linux 还需：
+uv run playwright install-deps firefox
 uv run alembic upgrade head
 ```
 
@@ -162,6 +174,13 @@ uv run alembic upgrade head
 ```bash
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### Docker 部署
+
+见根目录 [README.md](../README.md) 的 Docker 章节。容器内：
+- venv 在 `/opt/venv`（PATH 已含，直接可用 `alembic` / `uvicorn`）
+- 工作目录 `/workspace/backend`
+- 入口脚本 `docker-entrypoint.sh` 自动执行迁移并启动
 
 健康检查：`curl http://127.0.0.1:8000/health` · 在线文档：`/docs`
 
@@ -209,12 +228,16 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 示例：
 
 ```bash
+# 本地
 curl http://127.0.0.1:8000/api/hardware
 curl "http://127.0.0.1:8000/api/hardware/1/trend?days=30"
 curl "http://127.0.0.1:8000/api/crawler/test?keyword=RTX%204090&pages=3"
 curl -X POST http://127.0.0.1:8000/api/crawler/run
-curl -X POST "http://127.0.0.1:8000/api/validator/run?limit=100"
 curl -H "X-Admin-Token: dev-admin-token" http://127.0.0.1:8000/api/hardware/admin
+
+# Docker
+curl http://localhost:8000/api/hardware
+docker compose exec backend curl http://localhost:8000/health
 ```
 
 ## 9. 维护脚本
@@ -228,18 +251,33 @@ curl -H "X-Admin-Token: dev-admin-token" http://127.0.0.1:8000/api/hardware/admi
 | `rerun_one_hardware.py --hardware-name <N>` | 单硬件当日重爬 + 清洗 + 聚合 |
 | `reset_backend_data.py` | 清空 `price_snapshots` / `daily_stats` 并按硬件池重建 `hardware_items`（**慎用**） |
 
+执行方式：
+
+```bash
+# 本地
+cd backend
+uv run python test_crawl.py "RTX 4090"
+
+# Docker
+docker compose exec backend python test_crawl.py "RTX 4090"
+```
+
 ## 10. 数据库查看（psql）
 
 ```bash
+# 本地
 export DB_HOST=localhost DB_PORT=5432 DB_USER=market DB_NAME=market
 export PGPASSWORD='<your_db_password>'
 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c 'select 1;'
+
+# Docker
+docker compose exec db psql -U market -d market
 ```
 
 某硬件某天的标题与判定理由：
 
 ```bash
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
+psql -h localhost -p 5432 -U market -d market <<'SQL'
 select h.name, p.price, p.is_valid, p.validation_reason, left(p.title, 80) as title
 from price_snapshots p
 join hardware_items h on h.id = p.hardware_id
@@ -251,11 +289,44 @@ SQL
 聚合结果：
 
 ```bash
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
+psql -h localhost -p 5432 -U market -d market <<'SQL'
 select h.name, d.stat_date, d.median_price, d.sample_count, d.price_level
 from daily_stats d
 join hardware_items h on h.id = d.hardware_id
 where d.stat_date = current_date
 order by h.category, h.name;
 SQL
+```
+
+## 11. Docker 相关
+
+### 容器内路径
+
+- 工作目录：`/workspace/backend`
+- venv：`/opt/venv`（已在 PATH）
+- .env：`/workspace/.env`（bind mount 到宿主根目录）
+- cookies.json：`/workspace/backend/cookies.json`（bind mount）
+- Playwright 浏览器：`/ms-playwright`
+
+### 常用 Docker 命令
+
+```bash
+# 重启后端（配置改动后）
+docker compose restart backend
+
+# 查看后端日志
+docker compose logs -f backend
+
+# 进入后端容器 shell
+docker compose exec backend bash
+
+# 执行迁移
+docker compose exec backend alembic upgrade head
+
+# 重置数据库
+docker compose exec backend python reset_backend_data.py
+
+# 完全重建（删除数据卷）
+docker compose down -v
+docker compose up --build
 ```
