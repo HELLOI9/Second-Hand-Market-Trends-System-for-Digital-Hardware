@@ -6,15 +6,22 @@
       <header class="ops-header">
         <div class="ops-header-copy">
           <h1 class="ops-header-title"><el-icon><Bell /></el-icon>价格提醒</h1>
-          <p class="ops-header-subtitle">统一管理价格阈值、通知通道和最近触发状态。</p>
+          <p class="ops-header-subtitle">统一管理价格阈值、邮箱地址和最近触发状态。</p>
         </div>
         <div class="target-box">
-          <el-button type="primary" :icon="Plus" @click="creatingVisible = true">创建新提醒</el-button>
+          <el-button type="primary" :icon="Plus" @click="openCreateDialog">创建新提醒</el-button>
         </div>
       </header>
     </template>
 
-      <el-dialog v-model="creatingVisible" title="创建新提醒" width="620px">
+      <el-dialog
+        v-model="creatingVisible"
+        title="创建新提醒"
+        width="620px"
+        class="alert-create-dialog"
+        modal-class="alert-create-overlay"
+        transition=""
+      >
         <el-form :model="draft" label-position="top" class="alert-grid">
           <el-form-item label="商品">
             <el-select v-model="selectedHardwareId" filterable placeholder=" ">
@@ -29,14 +36,8 @@
           <el-form-item label="价格阈值">
             <el-input v-model="minPriceText" inputmode="decimal" :placeholder="priceThresholdPlaceholder" />
           </el-form-item>
-          <el-form-item label="通道">
-            <el-select v-model="draft.channel">
-              <el-option label="Webhook" value="webhook" />
-              <el-option label="Telegram" value="telegram" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="推送地址">
-            <el-input v-model="channelTarget" placeholder="Webhook URL 或 Telegram chat_id" @change="saveTarget" />
+          <el-form-item label="邮箱地址">
+            <el-input v-model="channelTarget" placeholder="收件邮箱，例如 name@example.com" />
           </el-form-item>
           <div class="alert-action-slot">
             <el-button type="primary" :icon="Plus" :loading="saving" @click="createAlert">创建提醒</el-button>
@@ -68,7 +69,7 @@
 
             <div class="rule-cell">
               <strong>{{ ruleText(alert) }}</strong>
-              <span>价格低于阈值时提醒</span>
+              <span>今日最低价低于阈值时提醒</span>
             </div>
 
             <div class="channel-cell">
@@ -106,24 +107,26 @@ import { alertsApi, crawlerApi, hardwareApi } from '@/api'
 import type { AlertPayload, CrawlerStatus, HardwareDetail, PriceAlert } from '@/api/types'
 import OpsLayout from '@/components/OpsLayout.vue'
 
-const TARGET_KEY = 'hardware-alert-target'
 const route = useRoute()
-const channelTarget = ref(localStorage.getItem(TARGET_KEY) ?? '')
+const channelTarget = ref('')
 const alerts = ref<PriceAlert[]>([])
+const allHardwareOptions = ref<HardwareDetail[]>([])
 const hardwareOptions = ref<HardwareDetail[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const crawlerStatus = ref<CrawlerStatus | null>(null)
 const selectedHardwareId = ref(typeof route.query.hardwareId === 'string' ? route.query.hardwareId : '')
 const minPriceText = ref('')
-const creatingVisible = ref(false)
+const isCreateRoute = route.query.mode === 'create'
+const creatingVisible = ref(isCreateRoute)
+const consumedCreateQuery = ref(false)
 
 const draft = reactive<AlertPayload>({
   scope_type: 'hardware',
   scope_value: selectedHardwareId.value,
   rule_type: 'below_price',
   threshold: null,
-  channel: 'webhook',
+  channel: 'email',
   channel_target: channelTarget.value,
   cooldown_hours: 24,
   is_active: true,
@@ -143,24 +146,67 @@ const priceThresholdPlaceholder = computed(() => {
   const median = selectedHardware.value?.latest_stats?.median_price
   return median ? `中位价 ¥${formatPrice(median)}` : '中位价'
 })
-
 watch(channelTarget, (value) => {
   draft.channel_target = value
 })
 
 onMounted(() => {
-  void loadHardwareOptions()
-  void loadCrawlerStatus()
-  void loadAlerts()
+  void initPage()
 })
+
+async function initPage() {
+  prepareCreateDialogFromQuery()
+  await loadHardwareOptions()
+  await Promise.all([loadCrawlerStatus(), loadAlerts()])
+  completeCreateDialogFromQuery()
+}
 
 async function loadHardwareOptions() {
   try {
-    const grouped = await hardwareApi.list()
-    hardwareOptions.value = Object.values(grouped).flat().filter((item) => item.is_active)
+    const items = await hardwareApi.adminList('dev-admin-token')
+    allHardwareOptions.value = items
+    hardwareOptions.value = items.filter((item) => item.is_active)
   } catch {
     ElMessage.error('加载订阅商品失败')
   }
+}
+
+function prepareCreateDialogFromQuery() {
+  if (consumedCreateQuery.value || route.query.mode !== 'create') return
+  consumedCreateQuery.value = true
+
+  const hardwareId = typeof route.query.hardwareId === 'string' ? route.query.hardwareId : ''
+  if (hardwareId) {
+    selectedHardwareId.value = hardwareId
+  }
+
+  const median = selectedHardware.value?.latest_stats?.median_price
+  minPriceText.value = median ? String(Math.round(median)) : ''
+  draft.channel = 'email'
+  channelTarget.value = ''
+  draft.channel_target = ''
+
+  const cleanUrl = hardwareId ? `/alerts?hardwareId=${encodeURIComponent(hardwareId)}` : '/alerts'
+  window.history.replaceState(window.history.state, '', cleanUrl)
+
+  creatingVisible.value = true
+}
+
+function completeCreateDialogFromQuery() {
+  if (!isCreateRoute) return
+  const median = selectedHardware.value?.latest_stats?.median_price
+  if (!minPriceText.value && median) {
+    minPriceText.value = String(Math.round(median))
+  }
+}
+
+function openCreateDialog() {
+  selectedHardwareId.value = ''
+  minPriceText.value = ''
+  draft.channel = 'email'
+  channelTarget.value = ''
+  draft.channel_target = ''
+  creatingVisible.value = true
 }
 
 async function loadCrawlerStatus() {
@@ -171,15 +217,14 @@ async function loadCrawlerStatus() {
   }
 }
 
-function saveTarget() {
-  localStorage.setItem(TARGET_KEY, channelTarget.value)
+function validateEmailTarget(target: string): string | null {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target) ? null : '请填写有效邮箱地址'
 }
 
 async function loadAlerts() {
-  saveTarget()
   loading.value = true
   try {
-    alerts.value = await alertsApi.list(channelTarget.value.trim() || undefined)
+    alerts.value = await alertsApi.list()
   } catch {
     ElMessage.error('加载提醒失败')
   } finally {
@@ -190,6 +235,11 @@ async function loadAlerts() {
 async function createAlert() {
   if (!channelTarget.value.trim()) {
     ElMessage.warning('先填写通知地址')
+    return
+  }
+  const targetError = validateEmailTarget(channelTarget.value.trim())
+  if (targetError) {
+    ElMessage.warning(targetError)
     return
   }
   if (!selectedHardwareId.value) {
@@ -209,6 +259,7 @@ async function createAlert() {
       scope_value: selectedHardwareId.value,
       rule_type: 'below_price',
       threshold,
+      channel: 'email',
       channel_target: channelTarget.value.trim(),
       cooldown_hours: 24,
     })
@@ -244,7 +295,6 @@ function editAlert(alert: PriceAlert) {
   minPriceText.value = alert.threshold ? String(alert.threshold) : ''
   draft.channel = alert.channel
   channelTarget.value = alert.channel_target
-  saveTarget()
   creatingVisible.value = true
   ElMessage.info('已填入上方表单，可按需调整后创建新提醒')
 }
@@ -257,12 +307,12 @@ async function deleteAlert(alert: PriceAlert) {
 
 function scopeText(alert: PriceAlert): string {
   if (alert.scope_type === 'all') return '全部对象'
-  const item = hardwareOptions.value.find((option) => String(option.id) === alert.scope_value)
+  const item = allHardwareOptions.value.find((option) => String(option.id) === alert.scope_value)
   return item?.name ?? `对象 ID：${alert.scope_value}`
 }
 
 function ruleText(alert: PriceAlert): string {
-  if (alert.rule_type === 'below_price') return `低于最低值 ¥${alert.threshold}`
+  if (alert.rule_type === 'below_price') return `低于价格阈值 ¥${alert.threshold}`
   if (alert.rule_type === 'below_median_pct') return `低于30天中位 ${alert.threshold}%`
   return '行情低位'
 }
@@ -340,7 +390,7 @@ function formatDateTime(value: string): string {
 .alert-head,
 .alert-row {
   display: grid;
-  grid-template-columns: minmax(210px, 1.15fr) minmax(190px, 1fr) minmax(190px, 0.9fr) minmax(160px, 0.8fr) minmax(190px, auto);
+  grid-template-columns: minmax(210px, 1.15fr) minmax(190px, 1fr) minmax(190px, 0.9fr) minmax(160px, 0.8fr) 220px;
   gap: 18px;
   align-items: center;
 }
@@ -352,6 +402,13 @@ function formatDateTime(value: string): string {
   color: var(--paper-muted);
   font-size: 12px;
   font-weight: 900;
+}
+
+.alert-head span:last-child {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
 }
 
 .alert-row {
@@ -418,11 +475,12 @@ function formatDateTime(value: string): string {
 }
 
 .action-cell {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 40px 32px 32px;
+  justify-content: center;
   gap: 12px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .action-cell :deep(.el-button) {
@@ -479,8 +537,7 @@ function formatDateTime(value: string): string {
   }
 
   .action-cell {
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
@@ -490,5 +547,22 @@ function formatDateTime(value: string): string {
     width: 100%;
     grid-template-columns: 1fr;
   }
+}
+</style>
+
+<style>
+.alert-create-dialog {
+  background: #ffffff;
+  opacity: 1 !important;
+}
+
+.alert-create-overlay {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.alert-create-overlay .el-dialog,
+.alert-create-overlay .el-dialog__body,
+.alert-create-overlay .el-form {
+  opacity: 1 !important;
 }
 </style>

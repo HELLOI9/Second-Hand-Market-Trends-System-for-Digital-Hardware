@@ -34,6 +34,11 @@ class ConfigUpdate(BaseModel):
     postgres_db: str | None = None
     postgres_host: str | None = None
     postgres_port: int | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
 
 
 # Maps from Pydantic field name to .env key
@@ -51,6 +56,11 @@ _FIELD_TO_ENV: dict[str, str] = {
     "postgres_db": "POSTGRES_DB",
     "postgres_host": "POSTGRES_HOST",
     "postgres_port": "POSTGRES_PORT",
+    "smtp_host": "SMTP_HOST",
+    "smtp_port": "SMTP_PORT",
+    "smtp_user": "SMTP_USER",
+    "smtp_password": "SMTP_PASSWORD",
+    "smtp_from": "SMTP_FROM",
 }
 
 _DB_FIELDS = {"postgres_user", "postgres_password", "postgres_db", "postgres_host", "postgres_port"}
@@ -87,6 +97,11 @@ def _build_config_response() -> dict:
         "postgres_db": s.postgres_db,
         "postgres_host": s.postgres_host,
         "postgres_port": s.postgres_port,
+        "smtp_host": s.smtp_host,
+        "smtp_port": s.smtp_port,
+        "smtp_user": s.smtp_user,
+        "smtp_password": s.smtp_password,
+        "smtp_from": s.smtp_from,
         "database_url_preview": _build_database_url(
             s.postgres_user, "***" if s.postgres_password else "",
             s.postgres_host, s.postgres_port, s.postgres_db,
@@ -98,26 +113,38 @@ def _build_config_response() -> dict:
 async def test_llm(_: AdminDep) -> dict:
     s = Settings()
     base_url = s.llm_base_url.rstrip("/")
-    url = f"{base_url}/chat/completions" if base_url.endswith("/v1") else f"{base_url}/v1/chat/completions"
+    if not base_url.startswith(("http://", "https://")):
+        return {"ok": False, "message": "API 基础地址需要以 http:// 或 https:// 开头"}
+
+    if s.llm_api_style == "responses":
+        url = f"{base_url}/responses"
+        payload = {
+            "model": s.llm_model,
+            "input": [{"role": "user", "content": [{"type": "input_text", "text": "你好"}]}],
+            "temperature": 0.1,
+        }
+    else:
+        url = f"{base_url}/chat/completions" if base_url.endswith("/v1") else f"{base_url}/v1/chat/completions"
+        payload = {
+            "model": s.llm_model,
+            "messages": [{"role": "user", "content": "你好"}],
+            "max_tokens": 32,
+            "temperature": 0.1,
+        }
+
     headers = {"Content-Type": "application/json"}
     if s.llm_api_key:
         headers["Authorization"] = f"Bearer {s.llm_api_key}"
-    payload = {
-        "model": s.llm_model,
-        "messages": [{"role": "user", "content": "你好"}],
-        "max_tokens": 32,
-        "temperature": 0.1,
-    }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(url, json=payload, headers=headers)
             resp.raise_for_status()
             resp.json()  # validate it parses and has no error field
-            return {"ok": True, "message": "LLM connected"}
+            return {"ok": True, "message": "LLM 连接成功"}
     except httpx.HTTPStatusError as e:
-        return {"ok": False, "message": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+        return {"ok": False, "message": f"HTTP {e.response.status_code}: {e.response.text[:160]}"}
     except httpx.ConnectError:
-        return {"ok": False, "message": f"Connection refused — check LLM_BASE_URL and that the service is running"}
+        return {"ok": False, "message": "连接失败，请检查 API 基础地址"}
     except (KeyError, IndexError):
         return {"ok": False, "message": "Connected but response format is not OpenAI-compatible"}
     except Exception as e:
