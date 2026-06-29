@@ -183,6 +183,47 @@
         </div>
       </section>
 
+      <!-- 邮件通知配置 -->
+      <section class="cfg-panel">
+        <div class="cfg-panel-head">
+          <h2>邮件通知配置</h2>
+          <p>配置 SMTP 邮箱用于发送价格提醒。发件邮箱需要开启 SMTP 服务并使用授权码（不是登录密码）。</p>
+        </div>
+        <div class="cfg-grid">
+          <el-form-item label="SMTP 服务器">
+            <el-input v-model="form.smtp_host" placeholder="smtp.qq.com" clearable />
+            <div class="cfg-hint">环境变量：<code>SMTP_HOST</code> · QQ邮箱: smtp.qq.com / 163邮箱: smtp.163.com</div>
+          </el-form-item>
+          <el-form-item label="SMTP 端口">
+            <el-input-number v-model="form.smtp_port" :min="1" :max="65535" style="width:100%" />
+            <div class="cfg-hint">环境变量：<code>SMTP_PORT</code> · SSL 端口通常为 465</div>
+          </el-form-item>
+          <el-form-item label="发件邮箱地址">
+            <el-input v-model="form.smtp_user" placeholder="your_bot@qq.com" clearable />
+            <div class="cfg-hint">环境变量：<code>SMTP_USER</code> · 用于登录 SMTP 服务器的邮箱账号</div>
+          </el-form-item>
+          <el-form-item label="SMTP 授权码">
+            <el-input
+              v-model="form.smtp_password"
+              :type="showSmtpPassword ? 'text' : 'password'"
+              placeholder="授权码（不是登录密码）"
+              clearable
+            >
+              <template #suffix>
+                <el-icon class="key-toggle" @click="showSmtpPassword = !showSmtpPassword">
+                  <component :is="showSmtpPassword ? Hide : View" />
+                </el-icon>
+              </template>
+            </el-input>
+            <div class="cfg-hint">环境变量：<code>SMTP_PASSWORD</code> · 在邮箱设置中开启 SMTP 服务后获取授权码</div>
+          </el-form-item>
+          <el-form-item label="发件人显示地址" class="cfg-span-full">
+            <el-input v-model="form.smtp_from" placeholder="留空则使用发件邮箱地址" clearable />
+            <div class="cfg-hint">环境变量：<code>SMTP_FROM</code> · 邮件"发件人"字段显示的地址，留空则使用 SMTP_USER</div>
+          </el-form-item>
+        </div>
+      </section>
+
       <!-- 闲鱼 Cookies -->
       <section class="cfg-panel">
         <div class="cfg-panel-head">
@@ -252,6 +293,7 @@ const saving = ref(false)
 const loadError = ref('')
 const showApiKey = ref(false)
 const showDbPassword = ref(false)
+const showSmtpPassword = ref(false)
 const original = ref<ConfigData | null>(null)
 
 type TestStatus = 'idle' | 'testing' | 'ok' | 'error'

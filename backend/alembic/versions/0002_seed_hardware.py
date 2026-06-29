@@ -19,9 +19,19 @@ def upgrade() -> None:
         "hardware_items",
         sa.column("name", sa.String),
         sa.column("category", sa.String),
-        sa.column("search_keywords", sa.String),
+        sa.column("search_keywords", sa.Text),
     )
-    op.bulk_insert(hardware_table, HARDWARE_POOL)
+    rows = [
+        {
+            "name": item["name"],
+            "category": item["category"],
+            "search_keywords": " ".join(item["search_keywords"])
+            if isinstance(item.get("search_keywords"), list)
+            else item.get("search_keywords", item["name"]),
+        }
+        for item in HARDWARE_POOL
+    ]
+    op.bulk_insert(hardware_table, rows)
 
 
 def downgrade() -> None:

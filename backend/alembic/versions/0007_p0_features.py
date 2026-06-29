@@ -34,11 +34,13 @@ def upgrade() -> None:
     )
     conn = op.get_bind()
     for item in HARDWARE_POOL:
-        keywords = item.get("search_keywords") or item["name"]
+        keywords = item.get("search_keywords") or [item["name"]]
+        if not isinstance(keywords, list):
+            keywords = [keywords]
         conn.execute(
             hardware_table.update()
             .where(hardware_table.c.name == item["name"])
-            .values(search_keywords=[keywords]),
+            .values(search_keywords=keywords),
         )
 
     op.create_table(
